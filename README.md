@@ -4,7 +4,7 @@ This repository contains utilities to download Formula 1 race data using the Jol
 
 ## Data Collection
 
-`data_collection.py` downloads results, driver standings and constructor standings for every race from the 2022 season up to the current year. The collected data includes:
+Raw responses are downloaded with `fetch_data.py` and stored under `jolpica_f1_cache/<season>/<round>.json`. `process_data.py` reads the cache and builds `f1_data_2022_to_present.csv`. A helper script `data_collection.py` runs both steps. The processed data includes:
 
 - circuit ID
 - start position on the grid
@@ -19,7 +19,7 @@ This repository contains utilities to download Formula 1 race data using the Jol
 - relative qualifying time delta in seconds
 - relative qualifying time delta as a percentage of pole time
 
-The script writes everything to `f1_data_2022_to_present.csv` in the current directory.
+The script writes the prepared dataset to `f1_data_2022_to_present.csv` in the current directory.
 
 ### Requirements
 
@@ -34,13 +34,19 @@ pip install requests
 
 ### Usage
 
-Run the script directly:
+First fetch the raw data:
 
 ```bash
-python data_collection.py
+python fetch_data.py
 ```
 
-The script will fetch race data sequentially from the Jolpica API and store it in the CSV file.
+Then generate the CSV using the cached responses:
+
+```bash
+python process_data.py
+```
+
+Alternatively run `python data_collection.py` to execute both steps in one go.
 
 The Jolpica API enforces a rate limit of **4 requests per second** and **500 requests per hour**. `data_collection.py` includes a simple rate limiter and will pause if a `429` error is returned. It can be executed multiple times; when the CSV already exists, the script resumes from the last recorded race and appends new data. While running, the script prints log messages with a few emojis so you can easily follow its progress in your terminal.
 
