@@ -114,13 +114,31 @@ def get_constructor_standings(season: int, round_no: int):
     return []
 
 
+def get_pitstops(season: int, round_no: int):
+    """Return pit stop data for a given round."""
+    # According to the Jolpica API docs the endpoint uses a trailing slash
+    # without the `.json` extension.
+    url = f"{BASE_URL}/{season}/{round_no}/pitstops/"
+    data = fetch_json(url)
+    races = data.get("RaceTable", {}).get("Races", [])
+    if races:
+        return races[0].get("PitStops", [])
+    return []
+
+
 def fetch_round_data(season: int, round_no: int):
     """Fetch and cache raw data for a given season and round."""
     os.makedirs(os.path.join(CACHE_DIR, str(season)), exist_ok=True)
     cache_file = os.path.join(CACHE_DIR, str(season), f"{round_no}.json")
     if os.path.exists(cache_file):
         with open(cache_file, encoding="utf-8") as f:
-            return json.load(f)
+            data = json.load(f)
+        # Add newly introduced fields if missing
+        if "pitstops" not in data:
+            data["pitstops"] = get_pitstops(season, round_no)
+            with open(cache_file, "w", encoding="utf-8") as f:
+                json.dump(data, f)
+        return data
 
     circuit_id, results = get_results(season, round_no)
     if not results:
@@ -129,6 +147,7 @@ def fetch_round_data(season: int, round_no: int):
     driver_standings = get_driver_standings(season, round_no)
     cons_standings = get_constructor_standings(season, round_no)
     qual_results = get_qualifying_results(season, round_no)
+    pitstops = get_pitstops(season, round_no)
 
     data = {
         "circuit_id": circuit_id,
@@ -136,6 +155,7 @@ def fetch_round_data(season: int, round_no: int):
         "driver_standings": driver_standings,
         "constructor_standings": cons_standings,
         "qualifying": qual_results,
+        "pitstops": pitstops,
     }
 
     with open(cache_file, "w", encoding="utf-8") as f:
