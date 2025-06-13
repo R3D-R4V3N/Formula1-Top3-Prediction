@@ -9,7 +9,7 @@ Raw responses are downloaded with `fetch_data.py` and stored under `jolpica_f1_c
 - circuit ID
 - start position on the grid
 - finish position
-- grid penalty places and flag
+- grid penalty places with penalty and bonus flags
 - Q2 qualifier flag
 - Q3 qualifier flag
 - total driver championship points after each race
