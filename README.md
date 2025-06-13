@@ -18,6 +18,9 @@ Raw responses are downloaded with `fetch_data.py` and stored under `jolpica_f1_c
 - team championship position after each race
 - relative qualifying time delta in seconds
 - relative qualifying time delta as a percentage of pole time
+- teammate qualifying gap in seconds
+- driver momentum over the last three races
+- pit stop difficulty index
 
 The script writes the prepared dataset to `f1_data_2022_to_present.csv` in the current directory.
 
@@ -57,5 +60,6 @@ All endpoints used by the script are documented in the `endpoints` directory. Th
 - `/{season}/{round}/results.json`
 - `/{season}/{round}/driverStandings.json`
 - `/{season}/{round}/constructorStandings.json`
+- `/{season}/{round}/pitstops/`
 
 Refer to the markdown files in the `endpoints` folder for details about optional query parameters and example responses.

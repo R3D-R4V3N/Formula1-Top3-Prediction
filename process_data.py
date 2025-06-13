@@ -92,8 +92,9 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                 "constructor_championship_rank",
                 "rqtd_sec",
                 "rqtd_pct",
-                "circuit_podium_rate",
-                "constructor_podium_rate",
+                "teammate_quali_gap_sec",
+                "driver_momentum",
+                "pit_stop_difficulty",
             ])
 
         if last:
@@ -101,6 +102,8 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
 
         start_s = last[0] if last else start_season
         start_r = last[1] + 1 if last else 1
+
+        points_history = {}
 
         for season in range(start_s, end_season + 1):
             round_no = start_r if season == start_s else 1
@@ -142,6 +145,22 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                     if vals:
                         pole_time = min(vals)
 
+                team_map = {}
+                for res in results:
+                    drv_id = res["Driver"]["driverId"]
+                    team_id = res["Constructor"]["constructorId"]
+                    team_map.setdefault(team_id, []).append(drv_id)
+
+                pit_durations = [
+                    try_float(p.get("duration"))
+                    for p in data.get("pitstops", [])
+                    if try_float(p.get("duration")) is not None
+                ]
+                pit_stop_difficulty = None
+                if pit_durations:
+                    avg_dur = sum(pit_durations) / len(pit_durations)
+                    pit_stop_difficulty = len(pit_durations) * avg_dur
+
                 # Convert standings to dicts for quick lookup
                 ds_map = {d["Driver"]["driverId"]: d for d in driver_standings}
                 cs_map = {c["Constructor"]["constructorId"]: c for c in cons_standings}
@@ -162,29 +181,26 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                     penalty_flag = 1 if penalty_places is not None and penalty_places > 0 else 0
                     bonus_flag = 1 if penalty_places is not None and penalty_places < 0 else 0
 
-                    # Handle missing championship rank
-                    rank = try_int(ds.get("position"))
-                    if rank is None:
-                        rank = last_driver_rank.get(driver, 999)
-                    else:
-                        last_driver_rank[driver] = rank
+                    teammates = [t for t in team_map.get(constructor, []) if t != driver]
+                    teammate_best = None
+                    if teammates:
+                        times = [best_times.get(t) for t in teammates if best_times.get(t) is not None]
+                        if times:
+                            teammate_best = min(times)
+                    teammate_gap = (
+                        best_times.get(driver) - teammate_best
+                        if best_times.get(driver) is not None and teammate_best is not None
+                        else None
+                    )
 
-                    # Sentinel values for missing qualifying times
-                    if best_times.get(driver) is not None and pole_time is not None:
-                        rqtd_sec = best_times[driver] - pole_time
-                        rqtd_pct = (best_times[driver] / pole_time - 1) * 100
-                    else:
-                        rqtd_sec = 5.0
-                        rqtd_pct = 5.0
-
-                    # Target/mean encoding features
-                    circ_count = circuit_counts.get(circuit_id, 0)
-                    circ_pods = circuit_podiums.get(circuit_id, 0)
-                    circuit_rate = circ_pods / circ_count if circ_count > 0 else 0.0
-
-                    cons_count = constructor_counts.get(constructor, 0)
-                    cons_pods = constructor_podiums.get(constructor, 0)
-                    constructor_rate = cons_pods / cons_count if cons_count > 0 else 0.0
+                    points_total = try_float(ds.get("points"))
+                    history = points_history.setdefault(driver, [])
+                    history.append(points_total if points_total is not None else 0.0)
+                    momentum = None
+                    if len(history) >= 7:
+                        last3 = history[-1] - history[-4]
+                        prev3 = history[-4] - history[-7]
+                        momentum = last3 - prev3
 
                     writer.writerow([
                         season,
@@ -203,10 +219,11 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                         constructor,
                         try_float(cs.get("points")),
                         try_int(cs.get("position")),
-                        rqtd_sec,
-                        rqtd_pct,
-                        circuit_rate,
-                        constructor_rate,
+                        best_times.get(driver) - pole_time if best_times.get(driver) is not None and pole_time is not None else None,
+                        (best_times.get(driver) / pole_time - 1) * 100 if best_times.get(driver) is not None and pole_time is not None else None,
+                        teammate_gap,
+                        momentum,
+                        pit_stop_difficulty,
                     ])
 
                     # Update statistics after writing row
