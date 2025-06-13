@@ -116,9 +116,8 @@ def get_constructor_standings(season: int, round_no: int):
 
 def get_pitstops(season: int, round_no: int):
     """Return pit stop data for a given round."""
-    # According to the Jolpica API docs the endpoint uses a trailing slash
-    # without the `.json` extension.
-    url = f"{BASE_URL}/{season}/{round_no}/pitstops/"
+    # Use the `.json` endpoint with an explicit limit to avoid pagination
+    url = f"{BASE_URL}/{season}/{round_no}/pitstops.json?limit=200"
     data = fetch_json(url)
     races = data.get("RaceTable", {}).get("Races", [])
     if races:
