@@ -27,11 +27,18 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 
 
 def rate_limited_get(url: str, retries: int = 5) -> Response:
-    """GET request respecting API limits and retrying on 429."""
+    """GET request respecting API limits and retrying on errors."""
     for attempt in range(retries):
         _respect_rate_limits()
         logging.info("GET %s", url)
-        resp = session.get(url)
+        try:
+            resp = session.get(url, timeout=10)
+        except Exception as exc:  # requests.exceptions.RequestException
+            delay = 2 ** attempt
+            logging.warning("connection error: %s, retrying in %.1fs", exc, delay)
+            time.sleep(delay)
+            continue
+
         REQUEST_LOG.append(time.monotonic())
         if resp.status_code == 429:
             retry_after = float(resp.headers.get("Retry-After", 0))
@@ -41,6 +48,7 @@ def rate_limited_get(url: str, retries: int = 5) -> Response:
             continue
         resp.raise_for_status()
         return resp
+
     resp.raise_for_status()
     return resp
 
