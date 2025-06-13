@@ -34,6 +34,22 @@ def try_float(value):
         return None
 
 
+def parse_pit_duration(value: str):
+    """Convert a pit stop duration string to seconds."""
+    if not value:
+        return None
+    if ":" in value:
+        try:
+            minutes, sec = value.split(":")
+            return int(minutes) * 60 + float(sec)
+        except ValueError:
+            return None
+    try:
+        return float(value)
+    except ValueError:
+        return None
+
+
 def get_last_round(csv_file: str):
     """Return the last processed (season, round) from an existing CSV file."""
     if not os.path.exists(csv_file):
@@ -151,11 +167,11 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                     team_id = res["Constructor"]["constructorId"]
                     team_map.setdefault(team_id, []).append(drv_id)
 
-                pit_durations = [
-                    try_float(p.get("duration"))
-                    for p in data.get("pitstops", [])
-                    if try_float(p.get("duration")) is not None
-                ]
+                pit_durations = []
+                for p in data.get("pitstops", []):
+                    dur = parse_pit_duration(p.get("duration"))
+                    if dur is not None:
+                        pit_durations.append(dur)
                 pit_stop_difficulty = None
                 if pit_durations:
                     avg_dur = sum(pit_durations) / len(pit_durations)
