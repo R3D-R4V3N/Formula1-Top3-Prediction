@@ -6,7 +6,9 @@ This repository contains utilities to download Formula 1 race data using the Jol
 
 `data_collection.py` downloads results, driver standings and constructor standings for every race from the 2022 season up to the current year. The collected data includes:
 
-- grid position
+- circuit ID
+- start position on the grid
+- finish position
 - total driver championship points after each race
 - driver championship position after each race
 - team (constructor) championship points after each race
