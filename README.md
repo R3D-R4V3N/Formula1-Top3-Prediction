@@ -4,52 +4,41 @@ This repository contains utilities to download Formula 1 race data using the Jol
 
 ## Data Collection
 
-`data_collection.py` downloads results, driver standings and constructor standings for every race from the 2022 season up to the current year. The collected data includes:
-
-- circuit ID
-- start position on the grid
-- finish position
-- grid penalty places and flag
-- Q2 qualifier flag
-- Q3 qualifier flag
-- total driver championship points after each race
-- driver championship position after each race
-- team (constructor) championship points after each race
-- team championship position after each race
-- relative qualifying time delta in seconds
-- relative qualifying time delta as a percentage of pole time
-
-The script writes everything to `f1_data_2022_to_present.csv` in the current directory.
+`data_collection.py` retrieves all race results for a range of seasons. The data
+is written incrementally to `f1_results.csv` and includes at least the driver ID
+and grid/finish positions for each race. A separate file `net_gain_5.csv`
+contains the rolling five-race average of grid position minus finish position
+for every driver.
 
 ### Requirements
 
 - Python 3.8+
-- `requests` library
+- `requests-cache`
+- `pandas`
 
-Install the dependency with:
+Install the dependencies with:
 
 ```bash
-pip install requests
+pip install requests-cache pandas
 ```
 
 ### Usage
 
-Run the script directly:
+Run the script from the command line specifying the start and end season:
 
 ```bash
-python data_collection.py
+python data_collection.py --start-season 2022 --end-season 2024
 ```
 
-The script will fetch race data sequentially from the Jolpica API and store it in the CSV file.
-
-The Jolpica API enforces a rate limit of **4 requests per second** and **500 requests per hour**. `data_collection.py` includes a simple rate limiter and will pause if a `429` error is returned. It can be executed multiple times; when the CSV already exists, the script resumes from the last recorded race and appends new data. While running, the script prints log messages with a few emojis so you can easily follow its progress in your terminal.
+The downloader respects the Jolpica API quota of **4 requests per second** and
+**500 requests per hour**. Because results are downloaded in bulk pages and are
+cached locally under `f1_cache/`, only around 40 requests are required for an
+entire season.
 
 ## API Endpoints
 
-All endpoints used by the script are documented in the `endpoints` directory. They follow the structure shown below:
+The API endpoints used by the script are documented in the `endpoints` directory. Results are retrieved via the season level endpoint shown below:
 
-- `/{season}/{round}/results.json`
-- `/{season}/{round}/driverStandings.json`
-- `/{season}/{round}/constructorStandings.json`
+- `/{season}/results.json?limit=100&offset=n`
 
 Refer to the markdown files in the `endpoints` folder for details about optional query parameters and example responses.
