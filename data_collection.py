@@ -164,6 +164,8 @@ def collect_data(start_season: int, end_season: int, output_file: str):
                 "driver_id",
                 "starting_grid_position",
                 "finishing_position",
+                "q2_flag",
+                "q3_flag",
                 "driver_points_scored",
                 "driver_championship_rank",
                 "constructor_id",
@@ -193,6 +195,7 @@ def collect_data(start_season: int, end_season: int, output_file: str):
 
                 # Map best qualifying times in seconds
                 best_times = {}
+                qual_flags = {}
                 for qr in qual_results:
                     drv = qr["Driver"]["driverId"]
                     t1 = parse_qual_time(qr.get("Q1"))
@@ -200,6 +203,13 @@ def collect_data(start_season: int, end_season: int, output_file: str):
                     t3 = parse_qual_time(qr.get("Q3"))
                     times = [t for t in (t1, t2, t3) if t is not None]
                     best_times[drv] = min(times) if times else None
+                    try:
+                        pos = int(qr.get("position"))
+                    except (TypeError, ValueError):
+                        pos = None
+                    q2_flag = 1 if pos is not None and pos <= 15 else 0
+                    q3_flag = 1 if pos is not None and pos <= 10 else 0
+                    qual_flags[drv] = (q2_flag, q3_flag)
 
                 pole_time = None
                 if best_times:
@@ -224,6 +234,8 @@ def collect_data(start_season: int, end_season: int, output_file: str):
                         driver,
                         result.get("grid"),
                         result.get("position"),
+                        qual_flags.get(driver, (0, 0))[0],
+                        qual_flags.get(driver, (0, 0))[1],
                         ds.get("points"),
                         ds.get("position"),
                         constructor,
