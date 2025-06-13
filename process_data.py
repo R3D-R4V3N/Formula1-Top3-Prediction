@@ -251,6 +251,21 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                         last3_c = cons_hist[-1] - cons_hist[-4]
                         prev3_c = cons_hist[-4] - cons_hist[-7]
                         cons_momentum = last3_c - prev3_c
+                    else:
+                        cons_momentum = 0.0
+
+                    gap_sec = (
+                        best_times.get(driver) - pole_time
+                        if best_times.get(driver) is not None and pole_time is not None
+                        else None
+                    )
+                    gap_pct = (
+                        (best_times.get(driver) / pole_time - 1) * 100
+                        if best_times.get(driver) is not None and pole_time is not None
+                        else None
+                    )
+                    gap_sec = gap_sec if gap_sec is not None else 5.0
+                    gap_pct = gap_pct if gap_pct is not None else 5.0
 
                     writer.writerow([
                         season,
@@ -269,8 +284,8 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                         constructor,
                         try_float(cs.get("points")),
                         try_int(cs.get("position")),
-                        best_times.get(driver) - pole_time if best_times.get(driver) is not None and pole_time is not None else None,
-                        (best_times.get(driver) / pole_time - 1) * 100 if best_times.get(driver) is not None and pole_time is not None else None,
+                        gap_sec,
+                        gap_pct,
                         teammate_gap,
                         momentum,
                         cons_momentum,
