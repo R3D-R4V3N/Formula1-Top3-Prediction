@@ -72,13 +72,15 @@ def fetch_json(url: str):
 
 
 def get_results(season: int, round_no: int):
-    """Return race results for a given season and round."""
+    """Return circuit id and race results for a given season and round."""
     url = f"{BASE_URL}/{season}/{round_no}/results.json"
     data = fetch_json(url)
     races = data.get("RaceTable", {}).get("Races", [])
     if races:
-        return races[0].get("Results", [])
-    return []
+        race = races[0]
+        circuit_id = race.get("Circuit", {}).get("circuitId")
+        return circuit_id, race.get("Results", [])
+    return None, []
 
 
 def get_driver_standings(season: int, round_no: int):
@@ -137,8 +139,10 @@ def collect_data(start_season: int, end_season: int, output_file: str):
             writer.writerow([
                 "season",
                 "round",
+                "circuitId",
                 "driverId",
-                "grid",
+                "startposition",
+                "finish_position",
                 "driver_points",
                 "driver_position",
                 "constructorId",
@@ -156,7 +160,7 @@ def collect_data(start_season: int, end_season: int, output_file: str):
             round_no = start_r if season == start_s else 1
             while True:
                 log(f"🚦 {season} round {round_no}")
-                results = get_results(season, round_no)
+                circuit_id, results = get_results(season, round_no)
                 if not results:
                     break
 
@@ -176,8 +180,10 @@ def collect_data(start_season: int, end_season: int, output_file: str):
                     writer.writerow([
                         season,
                         round_no,
+                        circuit_id,
                         driver,
                         result.get("grid"),
+                        result.get("position"),
                         ds.get("points"),
                         ds.get("position"),
                         constructor,
