@@ -8,9 +8,15 @@ from fetch_data import fetch_round_data, log
 
 
 def parse_qual_time(time_str: str):
-    """Convert a qualifying lap time 'm:ss.sss' to seconds."""
+    """Convert a qualifying lap time 'm:ss.sss' or 'ss.sss' to seconds."""
     if not time_str:
         return None
+    if ":" not in time_str:
+        # Some qualifying times are reported without a minutes component
+        try:
+            return float(time_str)
+        except ValueError:
+            return None
     try:
         minutes, sec = time_str.split(":")
         return int(minutes) * 60 + float(sec)
@@ -110,6 +116,7 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                 "rqtd_pct",
                 "teammate_quali_gap_sec",
                 "driver_momentum",
+                "constructor_momentum",
                 "pit_stop_difficulty",
             ])
 
@@ -120,6 +127,7 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
         start_r = last[1] + 1 if last else 1
 
         points_history = {}
+        constructor_points_history = {}
 
         for season in range(start_s, end_season + 1):
             round_no = start_r if season == start_s else 1
@@ -231,6 +239,15 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                         prev3 = history[-4] - history[-7]
                         momentum = last3 - prev3
 
+                    cons_points = try_float(cs.get("points"))
+                    cons_hist = constructor_points_history.setdefault(constructor, [])
+                    cons_hist.append(cons_points if cons_points is not None else 0.0)
+                    cons_momentum = None
+                    if len(cons_hist) >= 7:
+                        last3_c = cons_hist[-1] - cons_hist[-4]
+                        prev3_c = cons_hist[-4] - cons_hist[-7]
+                        cons_momentum = last3_c - prev3_c
+
                     writer.writerow([
                         season,
                         round_no,
@@ -252,6 +269,7 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                         (best_times.get(driver) / pole_time - 1) * 100 if best_times.get(driver) is not None and pole_time is not None else None,
                         teammate_gap,
                         momentum,
+                        cons_momentum,
                         pit_stop_difficulty,
                     ])
 
