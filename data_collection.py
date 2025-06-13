@@ -71,6 +71,27 @@ def fetch_json(url: str):
     resp.raise_for_status()
 
 
+def parse_qual_time(time_str: str):
+    """Convert a qualifying lap time 'm:ss.sss' to seconds."""
+    if not time_str:
+        return None
+    try:
+        minutes, sec = time_str.split(":")
+        return int(minutes) * 60 + float(sec)
+    except ValueError:
+        return None
+
+
+def get_qualifying_results(season: int, round_no: int):
+    """Return the list of qualifying results for a race."""
+    url = f"{BASE_URL}/{season}/{round_no}/qualifying.json"
+    data = fetch_json(url)
+    races = data.get("RaceTable", {}).get("Races", [])
+    if races:
+        return races[0].get("QualifyingResults", [])
+    return []
+
+
 def get_results(season: int, round_no: int):
     """Return circuit id and race results for a given season and round."""
     url = f"{BASE_URL}/{season}/{round_no}/results.json"
@@ -148,6 +169,8 @@ def collect_data(start_season: int, end_season: int, output_file: str):
                 "constructor_id",
                 "constructor_points_scored",
                 "constructor_championship_rank",
+                "rqtd_sec",
+                "rqtd_pct",
             ])
 
         if last:
@@ -166,6 +189,23 @@ def collect_data(start_season: int, end_season: int, output_file: str):
 
                 driver_standings = get_driver_standings(season, round_no)
                 cons_standings = get_constructor_standings(season, round_no)
+                qual_results = get_qualifying_results(season, round_no)
+
+                # Map best qualifying times in seconds
+                best_times = {}
+                for qr in qual_results:
+                    drv = qr["Driver"]["driverId"]
+                    t1 = parse_qual_time(qr.get("Q1"))
+                    t2 = parse_qual_time(qr.get("Q2"))
+                    t3 = parse_qual_time(qr.get("Q3"))
+                    times = [t for t in (t1, t2, t3) if t is not None]
+                    best_times[drv] = min(times) if times else None
+
+                pole_time = None
+                if best_times:
+                    vals = [t for t in best_times.values() if t is not None]
+                    if vals:
+                        pole_time = min(vals)
 
                 # Convert standings to dicts for quick lookup
                 ds_map = {d["Driver"]["driverId"]: d for d in driver_standings}
@@ -189,6 +229,8 @@ def collect_data(start_season: int, end_season: int, output_file: str):
                         constructor,
                         cs.get("points"),
                         cs.get("position"),
+                        best_times.get(driver) - pole_time if best_times.get(driver) is not None and pole_time is not None else None,
+                        (best_times.get(driver) / pole_time - 1) * 100 if best_times.get(driver) is not None and pole_time is not None else None,
                     ])
 
                 log(f"✅ stored {len(results)} results for {season} round {round_no}")
