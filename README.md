@@ -13,6 +13,8 @@ This repository contains utilities to download Formula 1 race data using the Jol
 - driver championship position after each race
 - team (constructor) championship points after each race
 - team championship position after each race
+- relative qualifying time delta in seconds
+- relative qualifying time delta as a percentage of pole time
 
 The script writes everything to `f1_data_2022_to_present.csv` in the current directory.
 
