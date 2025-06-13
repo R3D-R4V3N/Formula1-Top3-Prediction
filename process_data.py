@@ -6,6 +6,9 @@ from datetime import datetime
 
 from fetch_data import fetch_round_data, log
 
+# Default values to avoid missing data in the output
+TEAMMATE_GAP_SENTINEL = 5.0  # seconds when no valid qualifying times
+
 
 def parse_qual_time(time_str: str):
     """Convert a qualifying lap time 'm:ss.sss' to seconds."""
@@ -216,16 +219,15 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                         times = [best_times.get(t) for t in teammates if best_times.get(t) is not None]
                         if times:
                             teammate_best = min(times)
-                    teammate_gap = (
-                        best_times.get(driver) - teammate_best
-                        if best_times.get(driver) is not None and teammate_best is not None
-                        else None
-                    )
+                    if best_times.get(driver) is not None and teammate_best is not None:
+                        teammate_gap = best_times.get(driver) - teammate_best
+                    else:
+                        teammate_gap = TEAMMATE_GAP_SENTINEL
 
                     points_total = try_float(ds.get("points"))
                     history = points_history.setdefault(driver, [])
                     history.append(points_total if points_total is not None else 0.0)
-                    momentum = None
+                    momentum = 0.0
                     if len(history) >= 7:
                         last3 = history[-1] - history[-4]
                         prev3 = history[-4] - history[-7]

@@ -18,8 +18,8 @@ Raw responses are downloaded with `fetch_data.py` and stored under `jolpica_f1_c
 - team championship position after each race
 - relative qualifying time delta in seconds
 - relative qualifying time delta as a percentage of pole time
-- teammate qualifying gap in seconds
-- driver momentum over the last three races
+- teammate qualifying gap in seconds (5.0 used when no valid times)
+- driver momentum over the last three races (0.0 for the first six rounds)
 - pit stop difficulty index
 
 The script writes the prepared dataset to `f1_data_2022_to_present.csv` in the current directory.
