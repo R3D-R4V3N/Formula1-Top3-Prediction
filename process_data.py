@@ -187,6 +187,19 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                     ds = ds_map.get(driver, {})
                     cs = cs_map.get(constructor, {})
 
+                    # Championship rank with fallback to last known value
+                    rank = try_int(ds.get("position"))
+                    if rank is None:
+                        rank = last_driver_rank.get(driver)
+                    else:
+                        last_driver_rank[driver] = rank
+
+                    # Historical counts for target/mean encoding
+                    circ_count = circuit_counts.get(circuit_id, 0)
+                    circ_pods = circuit_podiums.get(circuit_id, 0)
+                    cons_count = constructor_counts.get(constructor, 0)
+                    cons_pods = constructor_podiums.get(constructor, 0)
+
                     grid_pos = try_int(result.get("grid"))
                     finish_pos = try_int(result.get("position"))
                     qual_pos = qual_positions.get(driver)
