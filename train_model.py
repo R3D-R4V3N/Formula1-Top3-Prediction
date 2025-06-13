@@ -3,6 +3,8 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 from xgboost import XGBClassifier
+from catboost import CatBoostClassifier
+from lightgbm import LGBMClassifier
 
 
 def load_data(path: str) -> pd.DataFrame:
@@ -39,22 +41,45 @@ def preprocess(df: pd.DataFrame) -> tuple:
     return X, y
 
 
-def train_model(X, y):
+def train_model(X, y, model_name: str = "xgb"):
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=42, stratify=y
     )
-    model = XGBClassifier(
-        n_estimators=5000,
-        max_depth=10,
-        learning_rate=0.05,
-        subsample=0.9,
-        colsample_bytree=0.9,
-        objective='binary:logistic',
-        eval_metric='logloss',
-        use_label_encoder=False,
-        verbosity=1,
-    )
-    model.fit(X_train, y_train, eval_set=[(X_test, y_test)], verbose=100)
+
+    if model_name == "xgb":
+        model = XGBClassifier(
+            n_estimators=5000,
+            max_depth=10,
+            learning_rate=0.05,
+            subsample=0.9,
+            colsample_bytree=0.9,
+            objective="binary:logistic",
+            eval_metric="logloss",
+            use_label_encoder=False,
+            verbosity=1,
+        )
+        model.fit(X_train, y_train, eval_set=[(X_test, y_test)], verbose=100)
+    elif model_name == "catboost":
+        model = CatBoostClassifier(
+            iterations=5000,
+            depth=8,
+            learning_rate=0.05,
+            loss_function="Logloss",
+            verbose=100,
+        )
+        model.fit(X_train, y_train, eval_set=(X_test, y_test))
+    elif model_name == "lgbm":
+        model = LGBMClassifier(
+            n_estimators=5000,
+            max_depth=10,
+            learning_rate=0.05,
+            subsample=0.9,
+            colsample_bytree=0.9,
+        )
+        model.fit(X_train, y_train, eval_set=[(X_test, y_test)], verbose=100)
+    else:
+        raise ValueError(f"Unsupported model: {model_name}")
+
     preds = model.predict(X_test)
     metrics = {
         'accuracy': accuracy_score(y_test, preds),
@@ -74,11 +99,12 @@ def main():
     parser = argparse.ArgumentParser(description='Train F1 top3 prediction model')
     parser.add_argument('--data', default='f1_data_2022_to_present.csv', help='CSV data path')
     parser.add_argument('--metrics', default='training_metrics.csv', help='Path to write metrics CSV')
+    parser.add_argument('--model', default='xgb', choices=['xgb', 'catboost', 'lgbm'], help='Model type to train')
     args = parser.parse_args()
 
     df = load_data(args.data)
     X, y = preprocess(df)
-    model, metrics = train_model(X, y)
+    model, metrics = train_model(X, y, args.model)
     save_metrics(metrics, args.metrics)
 
 
