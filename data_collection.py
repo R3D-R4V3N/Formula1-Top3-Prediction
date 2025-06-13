@@ -137,17 +137,17 @@ def collect_data(start_season: int, end_season: int, output_file: str):
         writer = csv.writer(csvfile)
         if not last:
             writer.writerow([
-                "season",
-                "round",
-                "circuitId",
-                "driverId",
-                "startposition",
-                "finish_position",
-                "driver_points",
-                "driver_position",
-                "constructorId",
-                "constructor_points",
-                "constructor_position",
+                "season_year",
+                "round_number",
+                "circuit_id",
+                "driver_id",
+                "starting_grid_position",
+                "finishing_position",
+                "driver_points_scored",
+                "driver_championship_rank",
+                "constructor_id",
+                "constructor_points_scored",
+                "constructor_championship_rank",
             ])
 
         if last:
