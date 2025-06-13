@@ -9,6 +9,8 @@ This repository contains utilities to download Formula 1 race data using the Jol
 - circuit ID
 - start position on the grid
 - finish position
+- Q2 qualifier flag
+- Q3 qualifier flag
 - total driver championship points after each race
 - driver championship position after each race
 - team (constructor) championship points after each race
