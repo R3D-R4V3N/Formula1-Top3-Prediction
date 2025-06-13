@@ -9,7 +9,7 @@ Raw responses are downloaded with `fetch_data.py` and stored under `jolpica_f1_c
 - circuit ID
 - start position on the grid
 - finish position
-- grid penalty places and flag
+- grid penalty places with separate penalty and bonus flags
 - Q2 qualifier flag
 - Q3 qualifier flag
 - total driver championship points after each race
@@ -18,6 +18,7 @@ Raw responses are downloaded with `fetch_data.py` and stored under `jolpica_f1_c
 - team championship position after each race
 - relative qualifying time delta in seconds
 - relative qualifying time delta as a percentage of pole time
+- drivers without a valid qualifying time are labelled as `no-time` for these deltas
 
 The script writes the prepared dataset to `f1_data_2022_to_present.csv` in the current directory.
 

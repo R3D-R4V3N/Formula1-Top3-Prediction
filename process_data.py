@@ -11,6 +11,22 @@ def parse_qual_time(time_str: str):
     """Convert a qualifying lap time 'm:ss.sss' to seconds."""
     if not time_str:
         return None
+
+
+def parse_int(value):
+    """Return an int or None from a value that may be a string."""
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def parse_float(value):
+    """Return a float or None from a value that may be a string."""
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
     try:
         minutes, sec = time_str.split(":")
         return int(minutes) * 60 + float(sec)
@@ -57,6 +73,7 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                 "finishing_position",
                 "grid_penalty_places",
                 "grid_penalty_flag",
+                "grid_bonus_flag",
                 "q2_flag",
                 "q3_flag",
                 "driver_points_scored",
@@ -124,35 +141,43 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                     ds = ds_map.get(driver, {})
                     cs = cs_map.get(constructor, {})
 
-                    try:
-                        grid_pos = int(result.get("grid"))
-                    except (TypeError, ValueError):
-                        grid_pos = None
+                    grid_pos = parse_int(result.get("grid"))
                     qual_pos = qual_positions.get(driver)
                     if grid_pos is not None and qual_pos is not None:
                         penalty_places = grid_pos - qual_pos
                     else:
                         penalty_places = None
                     penalty_flag = 1 if penalty_places is not None and penalty_places > 0 else 0
+                    bonus_flag = 1 if penalty_places is not None and penalty_places < 0 else 0
+
+                    rqtd_sec = None
+                    rqtd_pct = None
+                    if best_times.get(driver) is not None and pole_time is not None:
+                        rqtd_sec = best_times.get(driver) - pole_time
+                        rqtd_pct = (best_times.get(driver) / pole_time - 1) * 100
+                    else:
+                        rqtd_sec = "no-time"
+                        rqtd_pct = "no-time"
 
                     writer.writerow([
                         season,
                         round_no,
                         circuit_id,
                         driver,
-                        result.get("grid"),
-                        result.get("position"),
+                        parse_int(result.get("grid")),
+                        parse_int(result.get("position")),
                         penalty_places,
                         penalty_flag,
+                        bonus_flag,
                         qual_flags.get(driver, (0, 0))[0],
                         qual_flags.get(driver, (0, 0))[1],
-                        ds.get("points"),
-                        ds.get("position"),
+                        parse_float(ds.get("points")),
+                        parse_int(ds.get("position")),
                         constructor,
-                        cs.get("points"),
-                        cs.get("position"),
-                        best_times.get(driver) - pole_time if best_times.get(driver) is not None and pole_time is not None else None,
-                        (best_times.get(driver) / pole_time - 1) * 100 if best_times.get(driver) is not None and pole_time is not None else None,
+                        parse_float(cs.get("points")),
+                        parse_int(cs.get("position")),
+                        rqtd_sec,
+                        rqtd_pct,
                     ])
 
                 log(f"✅ stored {len(results)} results for {season} round {round_no}")
