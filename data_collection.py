@@ -164,6 +164,8 @@ def collect_data(start_season: int, end_season: int, output_file: str):
                 "driver_id",
                 "starting_grid_position",
                 "finishing_position",
+                "grid_penalty_places",
+                "grid_penalty_flag",
                 "q2_flag",
                 "q3_flag",
                 "driver_points_scored",
@@ -196,6 +198,7 @@ def collect_data(start_season: int, end_season: int, output_file: str):
                 # Map best qualifying times in seconds
                 best_times = {}
                 qual_flags = {}
+                qual_positions = {}
                 for qr in qual_results:
                     drv = qr["Driver"]["driverId"]
                     t1 = parse_qual_time(qr.get("Q1"))
@@ -210,6 +213,8 @@ def collect_data(start_season: int, end_season: int, output_file: str):
                     q2_flag = 1 if pos is not None and pos <= 15 else 0
                     q3_flag = 1 if pos is not None and pos <= 10 else 0
                     qual_flags[drv] = (q2_flag, q3_flag)
+                    if pos is not None:
+                        qual_positions[drv] = pos
 
                 pole_time = None
                 if best_times:
@@ -227,6 +232,17 @@ def collect_data(start_season: int, end_season: int, output_file: str):
                     ds = ds_map.get(driver, {})
                     cs = cs_map.get(constructor, {})
 
+                    try:
+                        grid_pos = int(result.get("grid"))
+                    except (TypeError, ValueError):
+                        grid_pos = None
+                    qual_pos = qual_positions.get(driver)
+                    if grid_pos is not None and qual_pos is not None:
+                        penalty_places = grid_pos - qual_pos
+                    else:
+                        penalty_places = None
+                    penalty_flag = 1 if penalty_places is not None and penalty_places > 0 else 0
+
                     writer.writerow([
                         season,
                         round_no,
@@ -234,6 +250,8 @@ def collect_data(start_season: int, end_season: int, output_file: str):
                         driver,
                         result.get("grid"),
                         result.get("position"),
+                        penalty_places,
+                        penalty_flag,
                         qual_flags.get(driver, (0, 0))[0],
                         qual_flags.get(driver, (0, 0))[1],
                         ds.get("points"),
