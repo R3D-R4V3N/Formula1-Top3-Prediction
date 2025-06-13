@@ -229,6 +229,8 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                         if best_times.get(driver) is not None and teammate_best is not None
                         else None
                     )
+                    if teammate_gap is None:
+                        teammate_gap = 5.0
 
                     points_total = try_float(ds.get("points"))
                     history = points_history.setdefault(driver, [])
@@ -238,6 +240,8 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                         last3 = history[-1] - history[-4]
                         prev3 = history[-4] - history[-7]
                         momentum = last3 - prev3
+                    else:
+                        momentum = 0.0
 
                     cons_points = try_float(cs.get("points"))
                     cons_hist = constructor_points_history.setdefault(constructor, [])
