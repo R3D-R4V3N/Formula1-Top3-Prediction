@@ -44,7 +44,11 @@ def train_model(X, y):
         X, y, test_size=0.2, random_state=42, stratify=y
     )
     model = XGBClassifier(
-        n_estimators=2000,
+        n_estimators=5000,
+        max_depth=10,
+        learning_rate=0.05,
+        subsample=0.9,
+        colsample_bytree=0.9,
         objective='binary:logistic',
         eval_metric='logloss',
         use_label_encoder=False,
