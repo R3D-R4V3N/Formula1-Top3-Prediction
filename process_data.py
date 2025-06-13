@@ -18,6 +18,22 @@ def parse_qual_time(time_str: str):
         return None
 
 
+def try_int(value):
+    """Return int(value) or None if conversion fails."""
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def try_float(value):
+    """Return float(value) or None if conversion fails."""
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def get_last_round(csv_file: str):
     """Return the last processed (season, round) from an existing CSV file."""
     if not os.path.exists(csv_file):
@@ -57,6 +73,7 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                 "finishing_position",
                 "grid_penalty_places",
                 "grid_penalty_flag",
+                "grid_bonus_flag",
                 "q2_flag",
                 "q3_flag",
                 "driver_points_scored",
@@ -124,33 +141,33 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                     ds = ds_map.get(driver, {})
                     cs = cs_map.get(constructor, {})
 
-                    try:
-                        grid_pos = int(result.get("grid"))
-                    except (TypeError, ValueError):
-                        grid_pos = None
+                    grid_pos = try_int(result.get("grid"))
+                    finish_pos = try_int(result.get("position"))
                     qual_pos = qual_positions.get(driver)
                     if grid_pos is not None and qual_pos is not None:
                         penalty_places = grid_pos - qual_pos
                     else:
                         penalty_places = None
                     penalty_flag = 1 if penalty_places is not None and penalty_places > 0 else 0
+                    bonus_flag = 1 if penalty_places is not None and penalty_places < 0 else 0
 
                     writer.writerow([
                         season,
                         round_no,
                         circuit_id,
                         driver,
-                        result.get("grid"),
-                        result.get("position"),
+                        grid_pos,
+                        finish_pos,
                         penalty_places,
                         penalty_flag,
+                        bonus_flag,
                         qual_flags.get(driver, (0, 0))[0],
                         qual_flags.get(driver, (0, 0))[1],
-                        ds.get("points"),
-                        ds.get("position"),
+                        try_float(ds.get("points")),
+                        try_int(ds.get("position")),
                         constructor,
-                        cs.get("points"),
-                        cs.get("position"),
+                        try_float(cs.get("points")),
+                        try_int(cs.get("position")),
                         best_times.get(driver) - pole_time if best_times.get(driver) is not None and pole_time is not None else None,
                         (best_times.get(driver) / pole_time - 1) * 100 if best_times.get(driver) is not None and pole_time is not None else None,
                     ])
