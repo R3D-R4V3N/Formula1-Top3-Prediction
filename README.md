@@ -76,5 +76,3 @@ python predict_top3.py --season 2025 --round 9
 ```
 
 The command above predicts the Spanish Grand Prix (round 9) for the 2025 season.
-It also writes a CSV `prediction_data_<season>_<round>.csv` containing the
-features and probabilities used to determine the podium.
