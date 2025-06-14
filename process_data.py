@@ -91,6 +91,8 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
     circuit_podiums = {}
     constructor_counts = {}
     constructor_podiums = {}
+    circuit_pass_hist = {}
+    pass_rates_all = []
 
     with open(output_file, mode, newline="", encoding="utf-8") as csvfile:
         writer = csv.writer(csvfile)
@@ -118,6 +120,7 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                 "driver_momentum",
                 "constructor_momentum",
                 "pit_stop_difficulty",
+                "overtake_difficulty",
             ])
 
         if last:
@@ -184,6 +187,35 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                 if pit_durations:
                     avg_dur = sum(pit_durations) / len(pit_durations)
                     pit_stop_difficulty = len(pit_durations) * avg_dur
+
+                # --- Overtake difficulty ---
+                hist_key = (circuit_id,)
+                pass_history = circuit_pass_hist.setdefault(hist_key, [])
+                if pass_rates_all:
+                    min_p = min(pass_rates_all)
+                    max_p = max(pass_rates_all)
+                    mean_rate = sum(pass_rates_all) / len(pass_rates_all)
+                    if max_p > min_p:
+                        global_mean_diff = 1 - (mean_rate - min_p) / (max_p - min_p)
+                    else:
+                        global_mean_diff = 0.5
+                else:
+                    min_p = max_p = 0.0
+                    global_mean_diff = 0.5
+
+                if pass_history and max_p > min_p:
+                    hist_pass_rate = sum(pass_history) / len(pass_history)
+                    ov_diff = 1 - (hist_pass_rate - min_p) / (max_p - min_p)
+                else:
+                    ov_diff = global_mean_diff
+
+                current_pass_rate = (
+                    sum(
+                        abs(try_int(r.get("position")) - (try_int(r.get("grid")) or 0))
+                        for r in results
+                    )
+                    / len(results)
+                )
 
                 # Convert standings to dicts for quick lookup
                 ds_map = {d["Driver"]["driverId"]: d for d in driver_standings}
@@ -290,6 +322,7 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                         momentum,
                         cons_momentum,
                         pit_stop_difficulty,
+                        ov_diff,
                     ])
 
                     # Update statistics after writing row
@@ -300,10 +333,28 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                             circuit_podiums[circuit_id] = circ_pods + 1
                             constructor_podiums[constructor] = cons_pods + 1
 
+                pass_history.append(current_pass_rate)
+                pass_rates_all.append(current_pass_rate)
+
                 log(f"✅ stored {len(results)} results for {season} round {round_no}")
                 round_no += 1
 
             start_r = 1
+
+        # Save circuit overtake difficulty mapping
+        if circuit_pass_hist:
+            avg_rates = {cid: sum(r) / len(r) for cid, r in circuit_pass_hist.items() if r}
+            min_p = min(avg_rates.values())
+            max_p = max(avg_rates.values())
+            with open("circuit_overtake_difficulty.csv", "w", newline="", encoding="utf-8") as diff_file:
+                w = csv.writer(diff_file)
+                w.writerow(["circuit_id", "overtake_difficulty"])
+                for cid, rate in avg_rates.items():
+                    if max_p > min_p:
+                        diff = 1 - (rate - min_p) / (max_p - min_p)
+                    else:
+                        diff = 0.5
+                    w.writerow([cid, diff])
 
 
 if __name__ == "__main__":
