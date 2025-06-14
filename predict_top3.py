@@ -77,6 +77,10 @@ def build_features(season: int, round_no: int, hist_df: pd.DataFrame) -> pd.Data
     )
 
     mean_psd = hist_df["pit_stop_difficulty"].mean()
+    diff_map = (
+        hist_df.groupby("circuit_id")["overtake_difficulty"].mean().to_dict()
+    )
+    diff_fallback = hist_df["overtake_difficulty"].mean()
 
     rows = []
     for res in results:
@@ -166,6 +170,7 @@ def build_features(season: int, round_no: int, hist_df: pd.DataFrame) -> pd.Data
                 driver_momentum=momentum,
                 constructor_momentum=cons_momentum,
                 pit_stop_difficulty=mean_psd,
+                overtake_difficulty=diff_map.get(circuit_id, diff_fallback),
             )
         )
 

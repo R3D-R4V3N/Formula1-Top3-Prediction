@@ -124,15 +124,59 @@ def get_constructor_standings(season: int, round_no: int):
     return []
 
 
-def get_pitstops(season: int, round_no: int):
-    """Return pit stop data for a given round."""
-    # Use the `.json` endpoint with an explicit limit to avoid pagination
-    url = f"{BASE_URL}/{season}/{round_no}/pitstops.json?limit=200"
-    data = fetch_json(url)
+def get_json(path: str, limit: int = 4500) -> dict:
+    """Return JSON data for an endpoint path."""
+    url = f"{BASE_URL}/{path}.json?limit={limit}"
+    return fetch_json(url)
+
+
+def _cache_path(season: int, round_no: int, suffix: str) -> str:
+    os.makedirs(os.path.join(CACHE_DIR, str(season)), exist_ok=True)
+    return os.path.join(CACHE_DIR, str(season), f"{round_no}_{suffix}.json")
+
+
+def get_laps(season: int, round_no: int) -> list:
+    """Return lap data for a given race with caching."""
+    cache_file = _cache_path(season, round_no, "laps")
+    if os.path.exists(cache_file):
+        with open(cache_file, encoding="utf-8") as f:
+            return json.load(f)
+
+    data = get_json(f"{season}/{round_no}/laps")
     races = data.get("RaceTable", {}).get("Races", [])
-    if races:
-        return races[0].get("PitStops", [])
-    return []
+    laps = races[0].get("Laps", []) if races else []
+    with open(cache_file, "w", encoding="utf-8") as f:
+        json.dump(laps, f)
+    return laps
+
+
+def get_pitstops(season: int, round_no: int) -> list:
+    """Return pit stop data for a given round with caching."""
+    cache_file = _cache_path(season, round_no, "pits")
+    if os.path.exists(cache_file):
+        with open(cache_file, encoding="utf-8") as f:
+            return json.load(f)
+
+    data = get_json(f"{season}/{round_no}/pitstops", limit=200)
+    races = data.get("RaceTable", {}).get("Races", [])
+    pits = races[0].get("PitStops", []) if races else []
+    with open(cache_file, "w", encoding="utf-8") as f:
+        json.dump(pits, f)
+    return pits
+
+
+def get_status(season: int, round_no: int) -> list:
+    """Return list of status events for a race with caching."""
+    cache_file = _cache_path(season, round_no, "status")
+    if os.path.exists(cache_file):
+        with open(cache_file, encoding="utf-8") as f:
+            return json.load(f)
+
+    data = get_json(f"{season}/{round_no}/status")
+    statuses = data.get("StatusTable", {}).get("Status", [])
+    with open(cache_file, "w", encoding="utf-8") as f:
+        json.dump(statuses, f)
+    return statuses
 
 
 def fetch_round_data(season: int, round_no: int):

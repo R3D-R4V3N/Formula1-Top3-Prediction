@@ -4,7 +4,22 @@ import csv
 import os
 from datetime import datetime
 
-from fetch_data import fetch_round_data, log
+import pandas as pd
+from pandas import json_normalize
+
+from fetch_data import (
+    fetch_round_data,
+    get_laps,
+    get_pitstops,
+    get_status,
+    log,
+)
+
+
+# Cache of passes per race for computing overtake difficulty
+race_pass_df = pd.DataFrame(
+    columns=["season", "round", "circuit_id", "passes"]
+)
 
 
 def parse_qual_time(time_str: str):
@@ -38,6 +53,75 @@ def try_float(value):
         return float(value)
     except (TypeError, ValueError):
         return None
+
+
+def detect_passes(laps: list, pit_df: list, status_df: list) -> int:
+    """Detect genuine on-track overtakes for a race."""
+    lap_df = json_normalize(
+        laps,
+        record_path="Timings",
+        meta="number",
+    ).rename(
+        columns={"number": "lap", "driverId": "driver", "position": "pos"}
+    )
+    if lap_df.empty:
+        return 0
+
+    lap_df["lap"] = lap_df["lap"].astype(int)
+    lap_df["pos"] = lap_df["pos"].astype(int)
+    lap_df.sort_values(["driver", "lap"], inplace=True)
+
+    lap_df["prev_pos"] = lap_df.groupby("driver")["pos"].shift(1)
+    lap_df["gain"] = lap_df["prev_pos"] - lap_df["pos"]
+
+    pits = pd.DataFrame(pit_df)
+    pits_by_lap = (
+        pits.groupby(pits["lap"].astype(int))["driverId"].apply(set).to_dict()
+        if not pits.empty
+        else {}
+    )
+
+    dnf_drivers = {
+        s.get("driverId")
+        for s in status_df
+        if s.get("status") != "Finished"
+    }
+
+    passes = []
+    for _, row in lap_df.iterrows():
+        if row["lap"] <= 1:
+            continue
+        if row["driver"] in dnf_drivers:
+            continue
+        if row["gain"] <= 0:
+            continue
+        if row["driver"] in pits_by_lap.get(row["lap"], set()):
+            continue
+        prev_driver = lap_df[
+            (lap_df["lap"] == row["lap"] - 1)
+            & (lap_df["pos"] == row["prev_pos"])
+        ]["driver"]
+        if (
+            not prev_driver.empty
+            and prev_driver.iloc[0] in pits_by_lap.get(row["lap"], set())
+        ):
+            continue
+        passes.append(row["gain"])
+
+    return int(sum(passes))
+
+
+def circuit_difficulty(df: pd.DataFrame) -> dict:
+    """Return mapping of circuit id to overtake difficulty."""
+    if df.empty:
+        return {}
+
+    max_passes = df["passes"].max()
+    difficulty = {}
+    for circ, grp in df.groupby("circuit_id"):
+        mean_p = grp["passes"].mean()
+        difficulty[circ] = 1 - (mean_p / max_passes if max_passes else 0)
+    return difficulty
 
 
 def parse_pit_duration(value: str):
@@ -118,6 +202,7 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                 "driver_momentum",
                 "constructor_momentum",
                 "pit_stop_difficulty",
+                "overtake_difficulty",
             ])
 
         if last:
@@ -141,6 +226,10 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                 driver_standings = data["driver_standings"]
                 cons_standings = data["constructor_standings"]
                 qual_results = data["qualifying"]
+
+                diff_map = circuit_difficulty(race_pass_df)
+                fallback_diff = 1.0
+                overtake_diff = diff_map.get(circuit_id, fallback_diff)
 
                 # Map best qualifying times in seconds
                 best_times = {}
@@ -290,6 +379,7 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                         momentum,
                         cons_momentum,
                         pit_stop_difficulty,
+                        overtake_diff,
                     ])
 
                     # Update statistics after writing row
@@ -300,7 +390,20 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                             circuit_podiums[circuit_id] = circ_pods + 1
                             constructor_podiums[constructor] = cons_pods + 1
 
-                log(f"✅ stored {len(results)} results for {season} round {round_no}")
+                laps = get_laps(season, round_no)
+                pits = get_pitstops(season, round_no)
+                statuses = get_status(season, round_no)
+                passes = detect_passes(laps, pits, statuses)
+                race_pass_df.loc[len(race_pass_df)] = [
+                    season,
+                    round_no,
+                    circuit_id,
+                    passes,
+                ]
+
+                log(
+                    f"✅ stored {len(results)} results for {season} round {round_no}"
+                )
                 round_no += 1
 
             start_r = 1

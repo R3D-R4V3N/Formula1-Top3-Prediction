@@ -58,40 +58,57 @@ groups = df["group"].values
 cat_cols = ["circuit_id", "driver_id", "constructor_id"]
 cat_idx = [X.columns.get_loc(c) for c in cat_cols]
 
+
 MODEL_PARAMS["class_weights"] = [1.0, (y == 0).sum() / (y == 1).sum()]
 
-# -------------------- Cross‑validation --------------------
-gkf = GroupKFold(n_splits=5)
-metrics = {k: [] for k in ["acc", "prec", "rec", "f1", "auc"]}
 
-for fold, (train_idx, test_idx) in enumerate(gkf.split(X, y, groups), 1):
-    model = CatBoostClassifier(**MODEL_PARAMS)
+def main() -> None:
+    """Train CatBoost model and report metrics."""
+    gkf = GroupKFold(n_splits=5)
+    metrics = {k: [] for k in ["acc", "prec", "rec", "f1", "auc"]}
 
-    train_pool = Pool(X.iloc[train_idx], y[train_idx], cat_features=cat_idx)
-    valid_pool = Pool(X.iloc[test_idx], y[test_idx], cat_features=cat_idx)
+    for fold, (train_idx, test_idx) in enumerate(gkf.split(X, y, groups), 1):
+        model = CatBoostClassifier(**MODEL_PARAMS)
 
-    model.fit(train_pool, eval_set=valid_pool, early_stopping_rounds=300)
+        train_pool = Pool(X.iloc[train_idx], y[train_idx], cat_features=cat_idx)
+        valid_pool = Pool(X.iloc[test_idx], y[test_idx], cat_features=cat_idx)
 
-    probs = model.predict_proba(X.iloc[test_idx])[:, 1]
-    preds = (probs >= THRESHOLD).astype(int)
+        model.fit(train_pool, eval_set=valid_pool, early_stopping_rounds=300)
 
-    acc = accuracy_score(y[test_idx], preds)
-    prec, rec, f1, _ = precision_recall_fscore_support(
-        y[test_idx], preds, average="binary", zero_division=0
-    )
-    auc = roc_auc_score(y[test_idx], probs)
+        probs = model.predict_proba(X.iloc[test_idx])[:, 1]
+        preds = (probs >= THRESHOLD).astype(int)
 
-    metrics["acc"].append(acc)
-    metrics["prec"].append(prec)
-    metrics["rec"].append(rec)
-    metrics["f1"].append(f1)
-    metrics["auc"].append(auc)
+        acc = accuracy_score(y[test_idx], preds)
+        prec, rec, f1, _ = precision_recall_fscore_support(
+            y[test_idx], preds, average="binary", zero_division=0
+        )
+        auc = roc_auc_score(y[test_idx], probs)
 
-    print(
-        f"[Fold {fold}] acc={acc:.3f}  prec={prec:.3f}  rec={rec:.3f}  "
-        f"f1={f1:.3f}  auc={auc:.3f}"
-    )
+        metrics["acc"].append(acc)
+        metrics["prec"].append(prec)
+        metrics["rec"].append(rec)
+        metrics["f1"].append(f1)
+        metrics["auc"].append(auc)
 
-print("\n=== Tuned CatBoost Results (mean ± std) ===")
-for m, vals in metrics.items():
-    print(f"{m}: {np.mean(vals):.3f} ± {np.std(vals):.3f}")
+        print(
+            f"[Fold {fold}] acc={acc:.3f}  prec={prec:.3f}  rec={rec:.3f}  "
+            f"f1={f1:.3f}  auc={auc:.3f}"
+        )
+
+    print("\n=== Tuned CatBoost Results (mean ± std) ===")
+    for m, vals in metrics.items():
+        print(f"{m}: {np.mean(vals):.3f} ± {np.std(vals):.3f}")
+
+    final_model = CatBoostClassifier(**MODEL_PARAMS)
+    pool = Pool(X, y, cat_features=cat_idx)
+    final_model.fit(pool)
+    shap_vals = final_model.get_feature_importance(pool, type="ShapValues")
+    mean_shap = np.abs(shap_vals[:, :-1]).mean(axis=0)
+    importance = pd.Series(mean_shap, index=X.columns)
+    assert (
+        importance.get("overtake_difficulty", 0) > 0.05
+    ), "overtake_difficulty importance too low"
+
+
+if __name__ == "__main__":
+    main()
