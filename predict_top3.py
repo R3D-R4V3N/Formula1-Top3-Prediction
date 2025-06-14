@@ -166,6 +166,10 @@ def build_features(season: int, round_no: int, hist_df: pd.DataFrame) -> pd.Data
                 driver_momentum=momentum,
                 constructor_momentum=cons_momentum,
                 pit_stop_difficulty=mean_psd,
+                # overtakes not available pre‑race
+                overtakes_made=0,
+                overtakes_lost=0,
+                net_overtakes=0,
             )
         )
 
