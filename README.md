@@ -69,10 +69,13 @@ Refer to the markdown files in the `endpoints` folder for details about optional
 
 Use `predict_top3.py` to predict the top three finishers for a specific race. The
 script trains only on races completed prior to the chosen round and relies solely
-on information available up to qualifying of that event.
+on information available up to qualifying of that event. The trained CatBoost
+model is saved to disk so subsequent predictions can reuse it.
 
 ```bash
 python predict_top3.py --season 2025 --round 9
 ```
 
 The command above predicts the Spanish Grand Prix (round 9) for the 2025 season.
+Specify `--model-path` to control where the model is stored and use
+`--force-train` to retrain even if the file exists.
