@@ -67,7 +67,9 @@ Refer to the markdown files in the `endpoints` folder for details about optional
 
 ## Podium Prediction
 
-Use `predict_top3.py` to predict the top three finishers for a specific race. The script trains on all past races and uses data up to the qualifying session of the chosen round.
+Use `predict_top3.py` to predict the top three finishers for a specific race. The
+script trains only on races completed prior to the chosen round and relies solely
+on information available up to qualifying of that event.
 
 ```bash
 python predict_top3.py --season 2025 --round 9

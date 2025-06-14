@@ -5,7 +5,6 @@ import pandas as pd
 from catboost import CatBoostClassifier, Pool
 
 from fetch_data import (
-    get_results,
     get_qualifying_results,
     get_driver_standings,
     get_constructor_standings,
@@ -27,22 +26,18 @@ def build_features(season: int, round_no: int, hist_df: pd.DataFrame) -> pd.Data
     race = get_round_info(season, round_no)
     circuit_id = race.get("Circuit", {}).get("circuitId")
 
-    circuit_id_res, results = get_results(season, round_no)
-    if circuit_id is None:
-        circuit_id = circuit_id_res
-
     qual_results = get_qualifying_results(season, round_no)
 
-    if not results:
-        results = []
-        for qr in qual_results:
-            results.append(
-                {
-                    "Driver": qr.get("Driver", {}),
-                    "Constructor": qr.get("Constructor", {}),
-                    "grid": qr.get("position"),
-                }
-            )
+    # Only rely on qualifying data to build the driver list
+    results = []
+    for qr in qual_results:
+        results.append(
+            {
+                "Driver": qr.get("Driver", {}),
+                "Constructor": qr.get("Constructor", {}),
+                "grid": qr.get("position"),  # use qualifying position as grid
+            }
+        )
 
     best_times = {}
     qual_pos = {}
@@ -93,11 +88,11 @@ def build_features(season: int, round_no: int, hist_df: pd.DataFrame) -> pd.Data
             grid_pos = None
 
         q_pos = qual_pos.get(drv)
-        penalty_places = (
-            grid_pos - q_pos if grid_pos is not None and q_pos is not None else None
-        )
-        penalty_flag = 1 if penalty_places is not None and penalty_places > 0 else 0
-        bonus_flag = 1 if penalty_places is not None and penalty_places < 0 else 0
+
+        # Grid penalties for the upcoming race are unknown at qualifying time
+        penalty_places = 0
+        penalty_flag = 0
+        bonus_flag = 0
 
         q2_flag = 1 if q_pos is not None and q_pos <= 15 else 0
         q3_flag = 1 if q_pos is not None and q_pos <= 10 else 0
@@ -188,8 +183,10 @@ def main() -> None:
     df["top3_flag"] = (df["finishing_position"] <= 3).astype(int)
     df["group"] = df["season_year"].astype(str) + "-" + df["round_number"].astype(str)
 
-    target_group = f"{args.season}-{args.round}"
-    train_df = df[df["group"] != target_group]
+    train_df = df[
+        (df["season_year"] < args.season)
+        | ((df["season_year"] == args.season) & (df["round_number"] < args.round))
+    ]
 
     X = train_df.drop(columns=["finishing_position", "top3_flag", "group"])
     y = train_df["top3_flag"].values
