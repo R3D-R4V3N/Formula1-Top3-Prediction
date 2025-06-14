@@ -189,7 +189,8 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                     pit_stop_difficulty = len(pit_durations) * avg_dur
 
                 # --- Overtake difficulty ---
-                hist_key = (circuit_id,)
+                # use plain circuit_id string as the key for pass history
+                hist_key = circuit_id
                 pass_history = circuit_pass_hist.setdefault(hist_key, [])
                 if pass_rates_all:
                     min_p = min(pass_rates_all)
