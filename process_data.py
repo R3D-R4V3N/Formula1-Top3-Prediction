@@ -3,6 +3,8 @@
 import csv
 import os
 from datetime import datetime
+import statistics
+import numpy as np
 
 from fetch_data import fetch_round_data, log
 
@@ -193,30 +195,30 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                 hist_key = circuit_id
                 pass_history = circuit_pass_hist.setdefault(hist_key, [])
                 if pass_rates_all:
-                    min_p = min(pass_rates_all)
-                    max_p = max(pass_rates_all)
+                    all_rates = sorted(pass_rates_all)
+                    low, high = np.percentile(all_rates, [10, 90])
                     mean_rate = sum(pass_rates_all) / len(pass_rates_all)
-                    if max_p > min_p:
-                        global_mean_diff = 1 - (mean_rate - min_p) / (max_p - min_p)
+                    if high > low:
+                        global_mean_diff = 1 - np.clip((mean_rate - low) / (high - low), 0, 1)
                     else:
                         global_mean_diff = 0.5
                 else:
-                    min_p = max_p = 0.0
+                    low = high = 0.0
                     global_mean_diff = 0.5
 
-                if pass_history and max_p > min_p:
+                if pass_history and high > low:
                     hist_pass_rate = sum(pass_history) / len(pass_history)
-                    ov_diff = 1 - (hist_pass_rate - min_p) / (max_p - min_p)
+                    ov_diff = 1 - np.clip((hist_pass_rate - low) / (high - low), 0, 1)
                 else:
                     ov_diff = global_mean_diff
 
-                current_pass_rate = (
-                    sum(
-                        abs(try_int(r.get("position")) - (try_int(r.get("grid")) or 0))
-                        for r in results
-                    )
-                    / len(results)
-                )
+                gains = [
+                    max((try_int(r.get("grid")) or 0) - try_int(r.get("position")), 0)
+                    for r in results
+                    if try_int(r.get("grid")) not in (None, 0)
+                    and try_int(r.get("position")) is not None
+                ]
+                current_pass_rate = statistics.median(gains) if gains else 0.0
 
                 # Convert standings to dicts for quick lookup
                 ds_map = {d["Driver"]["driverId"]: d for d in driver_standings}
@@ -345,14 +347,14 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
         # Save circuit overtake difficulty mapping
         if circuit_pass_hist:
             avg_rates = {cid: sum(r) / len(r) for cid, r in circuit_pass_hist.items() if r}
-            min_p = min(avg_rates.values())
-            max_p = max(avg_rates.values())
+            all_rates = sorted(pass_rates_all)
+            low, high = np.percentile(all_rates, [10, 90])
             with open("circuit_overtake_difficulty.csv", "w", newline="", encoding="utf-8") as diff_file:
                 w = csv.writer(diff_file)
                 w.writerow(["circuit_id", "overtake_difficulty"])
                 for cid, rate in avg_rates.items():
-                    if max_p > min_p:
-                        diff = 1 - (rate - min_p) / (max_p - min_p)
+                    if high > low:
+                        diff = 1 - np.clip((rate - low) / (high - low), 0, 1)
                     else:
                         diff = 0.5
                     w.writerow([cid, diff])
@@ -360,4 +362,4 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
 
 if __name__ == "__main__":
     current_year = datetime.now().year
-    prepare_dataset(2022, current_year, "f1_data_2022_to_present.csv")
+    prepare_dataset(2014, current_year, "f1_data_2022_to_present.csv")
