@@ -203,7 +203,26 @@ def main() -> None:
     features = build_features(args.season, args.round, train_df)
     preds = model.predict_proba(Pool(features, cat_features=cat_idx))[:, 1]
     features["prob"] = preds
-    top3 = features.sort_values("prob", ascending=False).head(3)["driver_id"].tolist()
+
+    # Expand columns for compatibility with the historical dataset
+    features["finishing_position"] = None
+    features["top3_flag"] = None
+    features["group"] = f"{args.season}-{args.round}"
+
+    train_df["prob"] = None
+    ordered_cols = train_df.columns.tolist()
+    features = features.reindex(columns=ordered_cols)
+
+    top3 = (
+        features.sort_values("prob", ascending=False)
+        .head(3)["driver_id"]
+        .tolist()
+    )
+
+    output_csv = Path(__file__).with_name(
+        f"prediction_data_{args.season}_{args.round}.csv"
+    )
+    pd.concat([train_df, features], ignore_index=True).to_csv(output_csv, index=False)
 
     print("Predicted podium drivers:")
     for drv in top3:
