@@ -1,13 +1,18 @@
 """
-Optuna hyper‑parameter tuning for CatBoost predicting Formula 1 top‑3 finishes.
+Optuna hyper‑parameter tuning for CatBoost predicting Formula 1 top‑3 finishes (GPU‑friendly).
 
-Run:
-    python tune_catboost_optuna.py --trials 100 --threshold 0.45 --gpu
+Run examples:
+    # GPU, 200 trials, threshold 0.45, metric logged elke 50 iteraties
+    python tune_catboost_optuna.py --trials 200 --threshold 0.45 --gpu
+
+    # CPU fallback, snelle sanity‑check
+    python tune_catboost_optuna.py --trials 30
 
 Arguments:
-    --trials     Number of Optuna trials (default: 50)
-    --threshold  Decision threshold for F1 calculation (default: 0.50)
-    --gpu        Use GPU training (requires CUDA‑enabled CatBoost)
+    --trials       Number of Optuna trials (default: 50)
+    --threshold    Decision threshold for F1 calculation (default: 0.50)
+    --gpu          Force GPU training (requires CUDA‑enabled CatBoost)
+    --metric_freq  Metric print frequency (default: 50)
 
 Requirements:
     pip install optuna catboost scikit‑learn pandas numpy
@@ -26,7 +31,8 @@ from sklearn.metrics import f1_score
 parser = argparse.ArgumentParser()
 parser.add_argument("--trials", type=int, default=50, help="Number of Optuna trials")
 parser.add_argument("--threshold", type=float, default=0.50, help="Decision threshold for F1")
-parser.add_argument("--gpu", action="store_true", help="Enable GPU training")
+parser.add_argument("--gpu", action="store_true", help="Enable GPU training (CUDA)")
+parser.add_argument("--metric_freq", type=int, default=50, help="CatBoost metric_period (print frequency)")
 args = parser.parse_args()
 
 # ---------------- Data ---------------- #
@@ -48,16 +54,20 @@ gkf = GroupKFold(n_splits=5)
 # ---------------- Objective ---------------- #
 
 def objective(trial):
+    """Optuna objective returning mean F1 across GroupKFold."""
     params = {
-        "iterations": trial.suggest_int("iterations", 1500, 6000),
-        "learning_rate": trial.suggest_float("lr", 0.01, 0.05, log=True),
+        "iterations": trial.suggest_int("iterations", 2000, 6000),
+        "learning_rate": trial.suggest_float("lr", 0.01, 0.04, log=True),
         "depth": trial.suggest_int("depth", 6, 10),
         "l2_leaf_reg": trial.suggest_int("l2", 2, 10),
         "bagging_temperature": trial.suggest_float("bag_temp", 0.0, 1.0),
-        "loss_function": "Logloss",
-        "eval_metric": "AUC",
         "random_seed": 42,
+        "loss_function": "Logloss",   # GPU‑native; AUC cpu‑fallback avoided
+        "eval_metric": "Logloss",     # we compute F1 ourselves
+        "border_count": 254,           # max bins for better accuracy on GPU
         "verbose": False,
+        "metric_period": args.metric_freq,
+        "allow_writing_files": False,
         "class_weights": [1.0, (y == 0).sum() / (y == 1).sum()],
         "task_type": "GPU" if args.gpu else "CPU",
         "devices": "0" if args.gpu else None,
@@ -78,9 +88,9 @@ def objective(trial):
     return float(np.mean(f1_scores))
 
 # ---------------- Study ---------------- #
-print(f"Starting Optuna tuning: {args.trials} trials, threshold={args.threshold}, GPU={args.gpu}")
+print(f"\n[Optuna] {args.trials} trials | threshold={args.threshold} | GPU={args.gpu}\n")
 
-study = optuna.create_study(direction="maximize", study_name="catboost_top3")
+study = optuna.create_study(direction="maximize", study_name="catboost_top3_gpu")
 study.optimize(objective, n_trials=args.trials, show_progress_bar=True)
 
 print("\nBest F1:", study.best_value)
