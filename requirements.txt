@@ -1,0 +1,9 @@
+catboost[gpu]
+catboost
+optuna
+xgboost
+lightgbm
+scikit-learn
+pandas
+numpy
+matplotlib
