@@ -15,7 +15,6 @@ def load_history():
     return df
 
 
-@st.cache_data(show_spinner=False)
 def train_model(train_df):
     X = train_df.drop(columns=["finishing_position", "top3_flag", "group"])
     y = train_df["top3_flag"].values
@@ -26,20 +25,25 @@ def train_model(train_df):
     params["class_weights"] = [1.0, (y == 0).sum() / (y == 1).sum()]
 
     model = CatBoostClassifier(**params)
-    model.fit(Pool(X, y, cat_features=cat_idx), verbose=False)
-    return model, cat_idx
+    pool = Pool(X, y, cat_features=cat_idx)
+    model.fit(pool, verbose=False)
+
+    imp = model.get_feature_importance(pool)
+    feat_imp = pd.Series(imp, index=X.columns).sort_values(ascending=False)
+
+    return model, cat_idx, feat_imp
 
 
 def predict_top3_streamlit(season: int, round_no: int, hist_df: pd.DataFrame):
     train_df = hist_df[(hist_df["season_year"] < season) |
                        ((hist_df["season_year"] == season) & (hist_df["round_number"] < round_no))]
 
-    model, cat_idx = train_model(train_df)
+    model, cat_idx, feat_imp = train_model(train_df)
 
     features = build_features(season, round_no, train_df)
     probs = model.predict_proba(Pool(features, cat_features=cat_idx))[:, 1]
     features["prob"] = probs
-    return features.sort_values("prob", ascending=False)
+    return features.sort_values("prob", ascending=False), feat_imp
 
 
 # ---------------------- Streamlit UI ----------------------
@@ -53,6 +57,8 @@ round_no = st.number_input("Round", min_value=1, max_value=max_round, step=1, va
 
 if st.button("Predict Podium"):
     with st.spinner("Running prediction..."):
-        results = predict_top3_streamlit(season, round_no, hist_df)
+        results, feat_imp = predict_top3_streamlit(season, round_no, hist_df)
     st.subheader("Predicted Top 3")
     st.table(results.head(3)[["driver_id", "prob"]])
+    st.subheader("Feature Importance")
+    st.bar_chart(feat_imp.head(10))
