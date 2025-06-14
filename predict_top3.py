@@ -176,17 +176,6 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Predict F1 podium for a race")
     parser.add_argument("--season", type=int, required=True, help="Season year")
     parser.add_argument("--round", type=int, required=True, help="Round number")
-    parser.add_argument(
-        "--model-path",
-        type=Path,
-        default=Path(__file__).with_name("podium_model.cbm"),
-        help="Path to save/load the trained CatBoost model",
-    )
-    parser.add_argument(
-        "--force-train",
-        action="store_true",
-        help="Retrain model even if a saved one exists",
-    )
     args = parser.parse_args()
 
     csv_path = Path(__file__).with_name("f1_data_2022_to_present.csv")
@@ -208,12 +197,8 @@ def main() -> None:
     params["class_weights"] = [1.0, (y == 0).sum() / (y == 1).sum()]
 
     model = CatBoostClassifier(**params)
-    if not args.force_train and args.model_path.exists():
-        model.load_model(args.model_path)
-    else:
-        train_pool = Pool(X, y, cat_features=cat_idx)
-        model.fit(train_pool)
-        model.save_model(args.model_path)
+    train_pool = Pool(X, y, cat_features=cat_idx)
+    model.fit(train_pool)
 
     features = build_features(args.season, args.round, train_df)
     preds = model.predict_proba(Pool(features, cat_features=cat_idx))[:, 1]
