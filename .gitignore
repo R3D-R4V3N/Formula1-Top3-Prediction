@@ -1,2 +1,4 @@
 jolpica_f1_cache/
 catboost_info/
+__pycache__/
+podium_model.cbm
