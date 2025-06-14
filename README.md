@@ -64,3 +64,15 @@ All endpoints used by the script are documented in the `endpoints` directory. Th
 - `/{season}/{round}/pitstops/`
 
 Refer to the markdown files in the `endpoints` folder for details about optional query parameters and example responses.
+
+## Podium Prediction
+
+Use `predict_top3.py` to predict the top three finishers for a specific race. The
+script trains only on races completed prior to the chosen round and relies solely
+on information available up to qualifying of that event.
+
+```bash
+python predict_top3.py --season 2025 --round 9
+```
+
+The command above predicts the Spanish Grand Prix (round 9) for the 2025 season.
