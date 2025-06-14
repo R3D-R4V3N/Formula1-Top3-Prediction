@@ -26,6 +26,14 @@ def build_features(season: int, round_no: int, hist_df: pd.DataFrame) -> pd.Data
     race = get_round_info(season, round_no)
     circuit_id = race.get("Circuit", {}).get("circuitId")
 
+    diff_path = Path(__file__).with_name("circuit_overtake_difficulty.csv")
+    circuit2diff = {}
+    global_mean_diff = 0.5
+    if diff_path.exists():
+        diff_df = pd.read_csv(diff_path)
+        circuit2diff = dict(zip(diff_df["circuit_id"], diff_df["overtake_difficulty"]))
+        global_mean_diff = diff_df["overtake_difficulty"].mean()
+
     qual_results = get_qualifying_results(season, round_no)
 
     # Only rely on qualifying data to build the driver list
@@ -142,6 +150,7 @@ def build_features(season: int, round_no: int, hist_df: pd.DataFrame) -> pd.Data
 
         momentum = compute_momentum(driver_hist.get(drv, []))
         cons_momentum = compute_momentum(cons_hist.get(constructor, []))
+        ov_diff = circuit2diff.get(circuit_id, global_mean_diff)
 
         rows.append(
             dict(
@@ -166,6 +175,7 @@ def build_features(season: int, round_no: int, hist_df: pd.DataFrame) -> pd.Data
                 driver_momentum=momentum,
                 constructor_momentum=cons_momentum,
                 pit_stop_difficulty=mean_psd,
+                overtake_difficulty=ov_diff,
             )
         )
 
