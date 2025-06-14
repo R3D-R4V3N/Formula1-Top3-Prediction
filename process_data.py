@@ -1,18 +1,22 @@
-"""Prepare a CSV dataset from cached Jolpica F1 race data."""
+# === process_data.py (updated) ===
+"""Prepare a CSV dataset from cached Jolpica F1 race data, including
+calculated overtake counts per driver.
+"""
 
 import csv
 import os
+from collections import defaultdict
 from datetime import datetime
+from typing import Dict, List
 
 from fetch_data import fetch_round_data, log
 
+# ---------------- Helper conversions ----------------
 
 def parse_qual_time(time_str: str):
-    """Convert a qualifying lap time 'm:ss.sss' or 'ss.sss' to seconds."""
     if not time_str:
         return None
     if ":" not in time_str:
-        # Some qualifying times are reported without a minutes component
         try:
             return float(time_str)
         except ValueError:
@@ -25,7 +29,6 @@ def parse_qual_time(time_str: str):
 
 
 def try_int(value):
-    """Return int(value) or None if conversion fails."""
     try:
         return int(value)
     except (TypeError, ValueError):
@@ -33,7 +36,6 @@ def try_int(value):
 
 
 def try_float(value):
-    """Return float(value) or None if conversion fails."""
     try:
         return float(value)
     except (TypeError, ValueError):
@@ -41,7 +43,6 @@ def try_float(value):
 
 
 def parse_pit_duration(value: str):
-    """Convert a pit stop duration string to seconds."""
     if not value:
         return None
     if ":" in value:
@@ -55,20 +56,50 @@ def parse_pit_duration(value: str):
     except ValueError:
         return None
 
+# ---------------- NEW: Overtake logic ----------------
+
+def tally_overtakes(laps: List[Dict]):
+    """Return per‑driver dicts of overtakes made and lost.
+
+    We skip the first lap (formation + start chaos) and count a pass only
+    when a driver exits a lap in a better position than on the previous lap.
+    """
+    pos_prev: Dict[str, int] = {}
+    made: Dict[str, int] = defaultdict(int)
+    lost: Dict[str, int] = defaultdict(int)
+
+    if not laps or len(laps) < 2:
+        return made, lost
+
+    for lap in laps[1:]:  # start at second flying lap
+        for timing in lap.get("Timings", []):
+            drv = timing.get("driverId")
+            pos = try_int(timing.get("position"))
+            if drv is None or pos is None:
+                continue
+            if drv in pos_prev:
+                delta = pos_prev[drv] - pos
+                if delta > 0:
+                    made[drv] += delta
+                elif delta < 0:
+                    lost[drv] += -delta
+            pos_prev[drv] = pos
+
+    return made, lost
+
+# ---------------- Core routine ----------------
 
 def get_last_round(csv_file: str):
-    """Return the last processed (season, round) from an existing CSV file."""
     if not os.path.exists(csv_file):
         return None
-
     with open(csv_file, newline="", encoding="utf-8") as f:
         reader = csv.reader(f)
-        header = next(reader, None)
+        _ = next(reader, None)
         last = None
         for row in reader:
-            if len(row) >= 2:
+            if row:
                 last = row
-        if last:
+        if last and len(last) >= 2:
             try:
                 return int(last[0]), int(last[1])
             except ValueError:
@@ -77,20 +108,15 @@ def get_last_round(csv_file: str):
 
 
 def prepare_dataset(start_season: int, end_season: int, output_file: str):
-    """Prepare CSV data for the given seasons using cached raw data."""
-
     log(f"📄 Preparing dataset from {start_season} to {end_season}")
     last = get_last_round(output_file)
     mode = "a" if last else "w"
 
-    # Keep track of last known driver standings position
-    last_driver_rank = {}
-
-    # Statistics for target/mean encoding of circuits and constructors
-    circuit_counts = {}
-    circuit_podiums = {}
-    constructor_counts = {}
-    constructor_podiums = {}
+    last_driver_rank: Dict[str, int] = {}
+    circuit_counts: Dict[str, int] = {}
+    circuit_podiums: Dict[str, int] = {}
+    constructor_counts: Dict[str, int] = {}
+    constructor_podiums: Dict[str, int] = {}
 
     with open(output_file, mode, newline="", encoding="utf-8") as csvfile:
         writer = csv.writer(csvfile)
@@ -118,16 +144,17 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                 "driver_momentum",
                 "constructor_momentum",
                 "pit_stop_difficulty",
+                # 👉 new fields
+                "overtakes_made",
+                "overtakes_lost",
+                "net_overtakes",
             ])
-
-        if last:
-            log(f"↩️ Resuming from {last[0]} round {last[1]}")
 
         start_s = last[0] if last else start_season
         start_r = last[1] + 1 if last else 1
 
-        points_history = {}
-        constructor_points_history = {}
+        points_history: Dict[str, List[float]] = {}
+        constructor_points_history: Dict[str, List[float]] = {}
 
         for season in range(start_s, end_season + 1):
             round_no = start_r if season == start_s else 1
@@ -136,136 +163,100 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                 data = fetch_round_data(season, round_no)
                 if data is None:
                     break
+
                 circuit_id = data["circuit_id"]
                 results = data["results"]
                 driver_standings = data["driver_standings"]
                 cons_standings = data["constructor_standings"]
                 qual_results = data["qualifying"]
+                laps = data.get("laps", [])
 
-                # Map best qualifying times in seconds
-                best_times = {}
-                qual_flags = {}
-                qual_positions = {}
+                # Map best qualifying times
+                best_times, qual_flags, qual_positions = {}, {}, {}
                 for qr in qual_results:
                     drv = qr["Driver"]["driverId"]
-                    t1 = parse_qual_time(qr.get("Q1"))
-                    t2 = parse_qual_time(qr.get("Q2"))
-                    t3 = parse_qual_time(qr.get("Q3"))
-                    times = [t for t in (t1, t2, t3) if t is not None]
-                    best_times[drv] = min(times) if times else None
-                    try:
-                        pos = int(qr.get("position"))
-                    except (TypeError, ValueError):
-                        pos = None
+                    t_vals = [parse_qual_time(qr.get(q)) for q in ("Q1", "Q2", "Q3")]
+                    valid = [t for t in t_vals if t is not None]
+                    best_times[drv] = min(valid) if valid else None
+                    pos = try_int(qr.get("position"))
                     q2_flag = 1 if pos is not None and pos <= 15 else 0
                     q3_flag = 1 if pos is not None and pos <= 10 else 0
                     qual_flags[drv] = (q2_flag, q3_flag)
                     if pos is not None:
                         qual_positions[drv] = pos
 
-                pole_time = None
-                if best_times:
-                    vals = [t for t in best_times.values() if t is not None]
-                    if vals:
-                        pole_time = min(vals)
+                pole_time = min([t for t in best_times.values() if t is not None], default=None)
 
-                team_map = {}
+                # team mapping
+                team_map: Dict[str, List[str]] = {}
                 for res in results:
-                    drv_id = res["Driver"]["driverId"]
-                    team_id = res["Constructor"]["constructorId"]
-                    team_map.setdefault(team_id, []).append(drv_id)
+                    d_id = res["Driver"]["driverId"]
+                    c_id = res["Constructor"]["constructorId"]
+                    team_map.setdefault(c_id, []).append(d_id)
 
-                pit_durations = []
-                for p in data.get("pitstops", []):
-                    dur = parse_pit_duration(p.get("duration"))
-                    if dur is not None:
-                        pit_durations.append(dur)
+                # pit stop difficulty (unchanged)
+                pit_durations = [parse_pit_duration(p.get("duration")) for p in data.get("pitstops", [])]
+                pit_durations = [d for d in pit_durations if d is not None]
                 pit_stop_difficulty = None
                 if pit_durations:
-                    avg_dur = sum(pit_durations) / len(pit_durations)
-                    pit_stop_difficulty = len(pit_durations) * avg_dur
+                    pit_stop_difficulty = len(pit_durations) * (sum(pit_durations) / len(pit_durations))
 
-                # Convert standings to dicts for quick lookup
+                # standings lookup
                 ds_map = {d["Driver"]["driverId"]: d for d in driver_standings}
                 cs_map = {c["Constructor"]["constructorId"]: c for c in cons_standings}
 
-                for result in results:
-                    driver = result["Driver"]["driverId"]
-                    constructor = result["Constructor"]["constructorId"]
+                # 👉 compute overtakes per driver for this race
+                made_dict, lost_dict = tally_overtakes(laps)
+
+                for res in results:
+                    driver = res["Driver"]["driverId"]
+                    constructor = res["Constructor"]["constructorId"]
                     ds = ds_map.get(driver, {})
                     cs = cs_map.get(constructor, {})
 
-                    # Championship rank with fallback to last known value
                     rank = try_int(ds.get("position"))
                     if rank is None:
                         rank = last_driver_rank.get(driver)
                     else:
                         last_driver_rank[driver] = rank
 
-                    # Historical counts for target/mean encoding
                     circ_count = circuit_counts.get(circuit_id, 0)
                     circ_pods = circuit_podiums.get(circuit_id, 0)
                     cons_count = constructor_counts.get(constructor, 0)
                     cons_pods = constructor_podiums.get(constructor, 0)
 
-                    grid_pos = try_int(result.get("grid"))
-                    finish_pos = try_int(result.get("position"))
+                    grid_pos = try_int(res.get("grid"))
+                    finish_pos = try_int(res.get("position"))
                     qual_pos = qual_positions.get(driver)
-                    if grid_pos is not None and qual_pos is not None:
-                        penalty_places = grid_pos - qual_pos
-                    else:
-                        penalty_places = None
-                    penalty_flag = 1 if penalty_places is not None and penalty_places > 0 else 0
-                    bonus_flag = 1 if penalty_places is not None and penalty_places < 0 else 0
+                    penalty_places = (grid_pos - qual_pos) if (grid_pos is not None and qual_pos is not None) else None
+                    penalty_flag = 1 if penalty_places and penalty_places > 0 else 0
+                    bonus_flag = 1 if penalty_places and penalty_places < 0 else 0
 
                     teammates = [t for t in team_map.get(constructor, []) if t != driver]
-                    teammate_best = None
-                    if teammates:
-                        times = [best_times.get(t) for t in teammates if best_times.get(t) is not None]
-                        if times:
-                            teammate_best = min(times)
-                    teammate_gap = (
-                        best_times.get(driver) - teammate_best
-                        if best_times.get(driver) is not None and teammate_best is not None
-                        else None
-                    )
-                    if teammate_gap is None:
-                        teammate_gap = 5.0
+                    teammate_best = min([best_times.get(t) for t in teammates if best_times.get(t) is not None], default=None)
+                    teammate_gap = (best_times.get(driver) - teammate_best) if (best_times.get(driver) and teammate_best) else 5.0
 
                     points_total = try_float(ds.get("points"))
-                    history = points_history.setdefault(driver, [])
-                    history.append(points_total if points_total is not None else 0.0)
-                    momentum = None
-                    if len(history) >= 7:
-                        last3 = history[-1] - history[-4]
-                        prev3 = history[-4] - history[-7]
-                        momentum = last3 - prev3
-                    else:
-                        momentum = 0.0
+                    hist = points_history.setdefault(driver, [])
+                    hist.append(points_total or 0.0)
+                    momentum = 0.0
+                    if len(hist) >= 7:
+                        momentum = (hist[-1] - hist[-4]) - (hist[-4] - hist[-7])
 
                     cons_points = try_float(cs.get("points"))
-                    cons_hist = constructor_points_history.setdefault(constructor, [])
-                    cons_hist.append(cons_points if cons_points is not None else 0.0)
-                    cons_momentum = None
-                    if len(cons_hist) >= 7:
-                        last3_c = cons_hist[-1] - cons_hist[-4]
-                        prev3_c = cons_hist[-4] - cons_hist[-7]
-                        cons_momentum = last3_c - prev3_c
-                    else:
-                        cons_momentum = 0.0
+                    chist = constructor_points_history.setdefault(constructor, [])
+                    chist.append(cons_points or 0.0)
+                    cons_momentum = 0.0
+                    if len(chist) >= 7:
+                        cons_momentum = (chist[-1] - chist[-4]) - (chist[-4] - chist[-7])
 
-                    gap_sec = (
-                        best_times.get(driver) - pole_time
-                        if best_times.get(driver) is not None and pole_time is not None
-                        else None
-                    )
-                    gap_pct = (
-                        (best_times.get(driver) / pole_time - 1) * 100
-                        if best_times.get(driver) is not None and pole_time is not None
-                        else None
-                    )
-                    gap_sec = gap_sec if gap_sec is not None else 5.0
-                    gap_pct = gap_pct if gap_pct is not None else 5.0
+                    gap_sec = (best_times.get(driver) - pole_time) if (best_times.get(driver) and pole_time) else 5.0
+                    gap_pct = ((best_times.get(driver) / pole_time - 1) * 100) if (best_times.get(driver) and pole_time) else 5.0
+
+                    # new overtake values (default 0)
+                    ov_made = made_dict.get(driver, 0)
+                    ov_lost = lost_dict.get(driver, 0)
+                    net_ov = ov_made - ov_lost
 
                     writer.writerow([
                         season,
@@ -290,9 +281,12 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                         momentum,
                         cons_momentum,
                         pit_stop_difficulty,
+                        ov_made,
+                        ov_lost,
+                        net_ov,
                     ])
 
-                    # Update statistics after writing row
+                    # update simple counts
                     if finish_pos is not None:
                         circuit_counts[circuit_id] = circ_count + 1
                         constructor_counts[constructor] = cons_count + 1
@@ -302,8 +296,7 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
 
                 log(f"✅ stored {len(results)} results for {season} round {round_no}")
                 round_no += 1
-
-            start_r = 1
+            start_r = 1  # reset after first season loop
 
 
 if __name__ == "__main__":
