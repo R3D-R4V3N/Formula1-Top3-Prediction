@@ -94,6 +94,16 @@ def get_results(season: int, round_no: int):
     return None, []
 
 
+def get_round_info(season: int, round_no: int):
+    """Return the race info for a given season and round."""
+    url = f"{BASE_URL}/{season}/{round_no}.json"
+    data = fetch_json(url)
+    races = data.get("RaceTable", {}).get("Races", [])
+    if races:
+        return races[0]
+    return {}
+
+
 def get_driver_standings(season: int, round_no: int):
     """Return driver standings after a given round."""
     url = f"{BASE_URL}/{season}/{round_no}/driverStandings.json"

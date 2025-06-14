@@ -9,6 +9,7 @@ from fetch_data import (
     get_qualifying_results,
     get_driver_standings,
     get_constructor_standings,
+    get_round_info,
 )
 from process_data import parse_qual_time
 from model_catboost_final import MODEL_PARAMS, THRESHOLD
@@ -23,8 +24,25 @@ def compute_momentum(history):
 
 
 def build_features(season: int, round_no: int, hist_df: pd.DataFrame) -> pd.DataFrame:
-    circuit_id, results = get_results(season, round_no)
+    race = get_round_info(season, round_no)
+    circuit_id = race.get("Circuit", {}).get("circuitId")
+
+    circuit_id_res, results = get_results(season, round_no)
+    if circuit_id is None:
+        circuit_id = circuit_id_res
+
     qual_results = get_qualifying_results(season, round_no)
+
+    if not results:
+        results = []
+        for qr in qual_results:
+            results.append(
+                {
+                    "Driver": qr.get("Driver", {}),
+                    "Constructor": qr.get("Constructor", {}),
+                    "grid": qr.get("position"),
+                }
+            )
 
     best_times = {}
     qual_pos = {}
@@ -161,8 +179,8 @@ def build_features(season: int, round_no: int, hist_df: pd.DataFrame) -> pd.Data
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Predict F1 podium for a race")
-    parser.add_argument("season", type=int, help="Season year")
-    parser.add_argument("round", type=int, help="Round number")
+    parser.add_argument("--season", type=int, required=True, help="Season year")
+    parser.add_argument("--round", type=int, required=True, help="Round number")
     args = parser.parse_args()
 
     csv_path = Path(__file__).with_name("f1_data_2022_to_present.csv")
