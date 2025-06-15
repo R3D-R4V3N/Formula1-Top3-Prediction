@@ -10,7 +10,7 @@ from fetch_data import (
     get_constructor_standings,
     get_round_info,
 )
-from process_data import parse_qual_time
+from process_data import parse_qual_time, load_overtaking_difficulty
 from model_catboost_final import MODEL_PARAMS, THRESHOLD
 
 
@@ -25,6 +25,8 @@ def compute_momentum(history):
 def build_features(season: int, round_no: int, hist_df: pd.DataFrame) -> pd.DataFrame:
     race = get_round_info(season, round_no)
     circuit_id = race.get("Circuit", {}).get("circuitId")
+    diff_map = load_overtaking_difficulty()
+    overtaking_diff = diff_map.get(circuit_id)
 
     qual_results = get_qualifying_results(season, round_no)
 
@@ -166,6 +168,7 @@ def build_features(season: int, round_no: int, hist_df: pd.DataFrame) -> pd.Data
                 driver_momentum=momentum,
                 constructor_momentum=cons_momentum,
                 pit_stop_difficulty=mean_psd,
+                overtaking_difficulty=overtaking_diff,
             )
         )
 
