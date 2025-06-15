@@ -1,0 +1,23 @@
+circuit_id,circuit_name,overtaking_difficulty
+albert_park,Albert Park Circuit,0.682
+shanghai,Shanghai International Circuit,0.566
+suzuka,Suzuka International Racing Course,0.608
+bahrain,Bahrain International Circuit,0.398
+jeddah,Jeddah Corniche Circuit,0.680
+miami,Miami International Autodrome,0.424
+imola,Imola Circuit,0.747
+monaco,Circuit de Monaco,0.926
+catalunya,Circuit de Barcelona-Catalunya,0.343
+villeneuve,Circuit Gilles Villeneuve,0.729
+baku,Baku City Circuit,0.594
+silverstone,Silverstone Circuit,0.684
+spa_francorchamps,Circuit de Spa-Francorchamps,0.548
+hungaroring,Hungaroring,0.713
+zandvoort,Circuit Zandvoort,0.209
+monza,Monza Circuit,0.603
+americas,Circuit of the Americas,0.495
+autodromo_hermanos_rodriguez,Autódromo Hermanos Rodríguez,0.659
+interlagos,Interlagos Circuit,0.449
+las_vegas,Las Vegas Strip Circuit,0.000
+lusail,Lusail International Circuit,0.510
+yas_marina,Yas Marina Circuit,0.377
