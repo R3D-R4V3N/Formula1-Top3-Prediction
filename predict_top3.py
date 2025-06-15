@@ -11,7 +11,7 @@ from fetch_data import (
     get_round_info,
     fetch_weather,
 )
-from process_data import parse_qual_time
+from process_data import parse_qual_time, DNF_WINDOW
 from model_catboost_final import MODEL_PARAMS, THRESHOLD
 
 
@@ -85,6 +85,17 @@ def build_features(season: int, round_no: int, hist_df: pd.DataFrame) -> pd.Data
         .to_dict()
     )
 
+    driver_dnf_hist = (
+        hist_df.groupby("driver_id")["dnf_flag"]
+        .apply(lambda s: s.sort_index().tolist())
+        .to_dict()
+    )
+    cons_dnf_hist = (
+        hist_df.groupby("constructor_id")["dnf_flag"]
+        .apply(lambda s: s.sort_index().tolist())
+        .to_dict()
+    )
+
     mean_psd = hist_df["pit_stop_difficulty"].mean()
     weather = fetch_weather(season, round_no)
 
@@ -153,6 +164,19 @@ def build_features(season: int, round_no: int, hist_df: pd.DataFrame) -> pd.Data
         drv_hist = driver_hist.get(drv, [])
         cons_hist_list = cons_hist.get(constructor, [])
 
+        drv_dnf_hist = driver_dnf_hist.get(drv, [])
+        cons_dnf_hist_list = cons_dnf_hist.get(constructor, [])
+
+        if drv_dnf_hist:
+            drv_dnf_rate = sum(drv_dnf_hist[-DNF_WINDOW:]) / min(len(drv_dnf_hist), DNF_WINDOW)
+        else:
+            drv_dnf_rate = 0.0
+
+        if cons_dnf_hist_list:
+            cons_dnf_rate = sum(cons_dnf_hist_list[-DNF_WINDOW:]) / min(len(cons_dnf_hist_list), DNF_WINDOW)
+        else:
+            cons_dnf_rate = 0.0
+
         last3_perf = compute_last3_performance(drv_hist)
         cons_last3_perf = compute_last3_performance(cons_hist_list)
 
@@ -183,6 +207,8 @@ def build_features(season: int, round_no: int, hist_df: pd.DataFrame) -> pd.Data
                 driver_momentum=momentum,
                 constructor_last3_performance=cons_last3_perf,
                 constructor_momentum=cons_momentum,
+                driver_dnf_rate=drv_dnf_rate,
+                constructor_dnf_rate=cons_dnf_rate,
                 pit_stop_difficulty=mean_psd,
                 temp_mean=weather.get("temp_mean"),
                 precip_sum=weather.get("precip_sum"),
@@ -210,7 +236,7 @@ def main() -> None:
         | ((df["season_year"] == args.season) & (df["round_number"] < args.round))
     ]
 
-    X = train_df.drop(columns=["finishing_position", "top3_flag", "group"])
+    X = train_df.drop(columns=["finishing_position", "dnf_flag", "top3_flag", "group"])
     y = train_df["top3_flag"].values
     cat_cols = ["circuit_id", "driver_id", "constructor_id"]
     cat_idx = [X.columns.get_loc(c) for c in cat_cols]

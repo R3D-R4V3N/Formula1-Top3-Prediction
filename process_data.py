@@ -7,6 +7,9 @@ from datetime import datetime
 
 from fetch_data import fetch_round_data, log
 
+# Number of past races to compute DNF rates from
+DNF_WINDOW = 5
+
 
 def parse_qual_time(time_str: str):
     """Convert a qualifying lap time 'm:ss.sss' or 'ss.sss' to seconds."""
@@ -113,6 +116,7 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                 "driver_id",
                 "starting_grid_position",
                 "finishing_position",
+                "dnf_flag",
                 "grid_penalty_places",
                 "grid_penalty_flag",
                 "grid_bonus_flag",
@@ -130,6 +134,8 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                 "driver_momentum",
                 "constructor_last3_performance",
                 "constructor_momentum",
+                "driver_dnf_rate",
+                "constructor_dnf_rate",
                 "pit_stop_difficulty",
                 "temp_mean",
                 "precip_sum",
@@ -145,6 +151,8 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
 
         points_history = {}
         constructor_points_history = {}
+        driver_dnf_history = {}
+        constructor_dnf_history = {}
 
         for season in range(start_s, end_season + 1):
             round_no = start_r if season == start_s else 1
@@ -292,6 +300,24 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                     else:
                         cons_momentum = 0.0
 
+                    status = str(result.get("status", "")).lower()
+                    dnf_flag = 0 if (
+                        "finished" in status or "lap" in status or "disqualified" in status
+                    ) else 1
+
+                    drv_dnf_hist = driver_dnf_history.setdefault(driver, [])
+                    cons_dnf_hist = constructor_dnf_history.setdefault(constructor, [])
+
+                    if drv_dnf_hist:
+                        drv_dnf_rate = sum(drv_dnf_hist[-DNF_WINDOW:]) / min(len(drv_dnf_hist), DNF_WINDOW)
+                    else:
+                        drv_dnf_rate = 0.0
+
+                    if cons_dnf_hist:
+                        cons_dnf_rate = sum(cons_dnf_hist[-DNF_WINDOW:]) / min(len(cons_dnf_hist), DNF_WINDOW)
+                    else:
+                        cons_dnf_rate = 0.0
+
                     gap_sec = (
                         best_times.get(driver) - pole_time
                         if best_times.get(driver) is not None and pole_time is not None
@@ -312,6 +338,7 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                         driver,
                         grid_pos,
                         finish_pos,
+                        dnf_flag,
                         penalty_places,
                         penalty_flag,
                         bonus_flag,
@@ -329,12 +356,17 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                         momentum,
                         cons_last3_perf,
                         cons_momentum,
+                        drv_dnf_rate,
+                        cons_dnf_rate,
                         pit_stop_difficulty,
                         weather.get("temp_mean"),
                         weather.get("precip_sum"),
                         weather.get("humidity_mean"),
                         weather.get("wind_mean"),
                     ])
+
+                    drv_dnf_hist.append(dnf_flag)
+                    cons_dnf_hist.append(dnf_flag)
 
                     # Update statistics after writing row
                     if finish_pos is not None:
