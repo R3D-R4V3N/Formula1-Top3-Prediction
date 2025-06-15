@@ -130,6 +130,8 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                 "driver_momentum",
                 "constructor_last3_performance",
                 "constructor_momentum",
+                "circuit_podium_rate",
+                "constructor_podium_rate",
                 "pit_stop_difficulty",
                 "temp_mean",
                 "precip_sum",
@@ -305,6 +307,13 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                     gap_sec = gap_sec if gap_sec is not None else 5.0
                     gap_pct = gap_pct if gap_pct is not None else 5.0
 
+                    circuit_podium_rate = (
+                        circ_pods / circ_count if circ_count else 0.0
+                    )
+                    constructor_podium_rate = (
+                        cons_pods / cons_count if cons_count else 0.0
+                    )
+
                     writer.writerow([
                         season,
                         round_no,
@@ -329,6 +338,8 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                         momentum,
                         cons_last3_perf,
                         cons_momentum,
+                        circuit_podium_rate,
+                        constructor_podium_rate,
                         pit_stop_difficulty,
                         weather.get("temp_mean"),
                         weather.get("precip_sum"),
