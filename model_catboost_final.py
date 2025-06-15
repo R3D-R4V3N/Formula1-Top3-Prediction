@@ -58,7 +58,11 @@ df = pd.read_csv(csv_path)
 df["top3_flag"] = (df["finishing_position"] <= 3).astype(int)
 df["group"] = df["season_year"].astype(str) + "-" + df["round_number"].astype(str)
 
-X = df.drop(columns=["finishing_position", "top3_flag", "group"])
+drop_cols = ["finishing_position", "top3_flag", "group"]
+if "dnf_flag" in df.columns:
+    drop_cols.append("dnf_flag")
+
+X = df.drop(columns=drop_cols)
 y = df["top3_flag"].values
 groups = df["group"].values
 

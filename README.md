@@ -21,6 +21,10 @@ This repository contains utilities to download Formula 1 race data using the Jol
 - teammate qualifying gap in seconds (uses 5.0 if no valid time for either driver)
 - driver momentum over the last three races (0.0 for the first six rounds)
 - constructor momentum over the last three races (0.0 for the first six rounds)
+- circuit podium rate
+- constructor podium rate
+- driver DNF rate (rolling window)
+- constructor DNF rate (rolling window)
 - pit stop difficulty index
 - mean temperature during the race window
 - total precipitation during the race window
