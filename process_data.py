@@ -3,6 +3,7 @@
 import csv
 import os
 from datetime import datetime
+from pathlib import Path
 
 from fetch_data import fetch_round_data, log
 
@@ -56,6 +57,35 @@ def parse_pit_duration(value: str):
         return None
 
 
+def load_overtaking_difficulty() -> dict:
+    """Return a mapping of circuit_id to overtaking difficulty."""
+    csv_path = Path(__file__).with_name("overtaking_difficulty.csv")
+    mapping = {}
+    if not csv_path.exists():
+        return mapping
+
+    with open(csv_path, newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            try:
+                diff = float(row["overtaking_difficulty"])
+            except (TypeError, ValueError):
+                continue
+            mapping[row["circuit_id"]] = diff
+
+    aliases = {
+        "vegas": "las_vegas",
+        "losail": "lusail",
+        "rodriguez": "autodromo_hermanos_rodriguez",
+        "spa": "spa_francorchamps",
+    }
+    for alias, target in aliases.items():
+        if target in mapping:
+            mapping[alias] = mapping[target]
+
+    return mapping
+
+
 def get_last_round(csv_file: str):
     """Return the last processed (season, round) from an existing CSV file."""
     if not os.path.exists(csv_file):
@@ -82,6 +112,8 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
     log(f"📄 Preparing dataset from {start_season} to {end_season}")
     last = get_last_round(output_file)
     mode = "a" if last else "w"
+
+    diff_map = load_overtaking_difficulty()
 
     # Keep track of last known driver standings position
     last_driver_rank = {}
@@ -118,6 +150,7 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                 "driver_momentum",
                 "constructor_momentum",
                 "pit_stop_difficulty",
+                "overtaking_difficulty",
             ])
 
         if last:
@@ -290,6 +323,7 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                         momentum,
                         cons_momentum,
                         pit_stop_difficulty,
+                        diff_map.get(circuit_id),
                     ])
 
                     # Update statistics after writing row
