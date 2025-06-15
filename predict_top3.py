@@ -12,6 +12,15 @@ from fetch_data import (
     fetch_weather,
 )
 from process_data import parse_qual_time
+
+DNF_WINDOW = 5
+
+
+def is_dnf(status: str) -> bool:
+    if not status:
+        return True
+    status = status.lower()
+    return not ("finished" in status or "lap" in status)
 from model_catboost_final import MODEL_PARAMS, THRESHOLD
 
 
@@ -90,6 +99,17 @@ def build_features(season: int, round_no: int, hist_df: pd.DataFrame) -> pd.Data
         .to_dict()
     )
 
+    driver_dnf_hist = (
+        hist_df.groupby("driver_id")["dnf_flag"]
+        .apply(lambda s: s.sort_index().tolist())
+        .to_dict()
+    )
+    cons_dnf_hist = (
+        hist_df.groupby("constructor_id")["dnf_flag"]
+        .apply(lambda s: s.sort_index().tolist())
+        .to_dict()
+    )
+
     circuit_stats = (
         hist_df.groupby("circuit_id")["top3_flag"]
         .agg(["sum", "count"])
@@ -101,7 +121,10 @@ def build_features(season: int, round_no: int, hist_df: pd.DataFrame) -> pd.Data
         .to_dict("index")
     )
 
-    mean_psd = hist_df["pit_stop_difficulty"].mean()
+    past_psd = hist_df.loc[
+        hist_df["circuit_id"] == circuit_id, "pit_stop_difficulty"
+    ]
+    mean_psd = past_psd.mean()
     weather = fetch_weather(season, round_no)
 
     rows = []
@@ -184,6 +207,15 @@ def build_features(season: int, round_no: int, hist_df: pd.DataFrame) -> pd.Data
             cons_stat["sum"] / cons_stat["count"] if cons_stat["count"] else 0.0
         )
 
+        d_hist = driver_dnf_hist.get(drv, [])
+        c_hist = cons_dnf_hist.get(constructor, [])
+        driver_dnf_rate = (
+            sum(d_hist[-DNF_WINDOW:]) / len(d_hist[-DNF_WINDOW:]) if d_hist else 0.0
+        )
+        constructor_dnf_rate = (
+            sum(c_hist[-DNF_WINDOW:]) / len(c_hist[-DNF_WINDOW:]) if c_hist else 0.0
+        )
+
         rows.append(
             dict(
                 season_year=season,
@@ -210,6 +242,8 @@ def build_features(season: int, round_no: int, hist_df: pd.DataFrame) -> pd.Data
                 constructor_momentum=cons_momentum,
                 circuit_podium_rate=circuit_podium_rate,
                 constructor_podium_rate=constructor_podium_rate,
+                driver_dnf_rate=driver_dnf_rate,
+                constructor_dnf_rate=constructor_dnf_rate,
                 pit_stop_difficulty=mean_psd,
                 temp_mean=weather.get("temp_mean"),
                 precip_sum=weather.get("precip_sum"),
@@ -237,7 +271,7 @@ def main() -> None:
         | ((df["season_year"] == args.season) & (df["round_number"] < args.round))
     ]
 
-    X = train_df.drop(columns=["finishing_position", "top3_flag", "group"])
+    X = train_df.drop(columns=["finishing_position", "top3_flag", "group", "dnf_flag"])
     y = train_df["top3_flag"].values
     cat_cols = ["circuit_id", "driver_id", "constructor_id"]
     cat_idx = [X.columns.get_loc(c) for c in cat_cols]
