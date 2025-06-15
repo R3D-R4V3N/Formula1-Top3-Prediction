@@ -305,17 +305,18 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                         last3_perf = 0.0
 
                     points_after = try_float(ds_curr_map.get(driver, {}).get("points"))
-                    history.append(
-                        points_after if points_after is not None else (history[-1] if history else 0.0)
-                    )
 
                     momentum = None
-                    if len(history) >= 7:
+                    if len(history) >= 6:
                         last3 = history[-1] - history[-4]
-                        prev3 = history[-4] - history[-7]
+                        prev3 = history[-4] - history[-6]
                         momentum = last3 - prev3
                     else:
                         momentum = 0.0
+
+                    history.append(
+                        points_after if points_after is not None else (history[-1] if history else 0.0)
+                    )
 
                     cons_points = try_float(cs.get("points"))
                     cons_hist = constructor_points_history.setdefault(constructor, [])
@@ -328,19 +329,19 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                     else:
                         cons_last3_perf = 0.0
 
+                    cons_momentum = None
+                    if len(cons_hist) >= 6:
+                        last3_c = cons_hist[-1] - cons_hist[-4]
+                        prev3_c = cons_hist[-4] - cons_hist[-6]
+                        cons_momentum = last3_c - prev3_c
+                    else:
+                        cons_momentum = 0.0
+
                     cons_hist.append(
                         cons_points_after
                         if cons_points_after is not None
                         else (cons_hist[-1] if cons_hist else 0.0)
                     )
-
-                    cons_momentum = None
-                    if len(cons_hist) >= 7:
-                        last3_c = cons_hist[-1] - cons_hist[-4]
-                        prev3_c = cons_hist[-4] - cons_hist[-7]
-                        cons_momentum = last3_c - prev3_c
-                    else:
-                        cons_momentum = 0.0
 
                     gap_sec = (
                         best_times.get(driver) - pole_time

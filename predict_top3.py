@@ -25,9 +25,9 @@ from model_catboost_final import MODEL_PARAMS, THRESHOLD
 
 
 def compute_momentum(history):
-    if len(history) >= 7:
+    if len(history) >= 6:
         last3 = history[-1] - history[-4]
-        prev3 = history[-4] - history[-7]
+        prev3 = history[-4] - history[-6]
         return last3 - prev3
     return 0.0
 
