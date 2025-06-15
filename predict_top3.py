@@ -23,6 +23,14 @@ def compute_momentum(history):
     return 0.0
 
 
+def compute_last3_performance(history):
+    if len(history) >= 4:
+        return (history[-1] - history[-4]) / 3
+    elif history:
+        return (history[-1] - history[0]) / len(history)
+    return 0.0
+
+
 def build_features(season: int, round_no: int, hist_df: pd.DataFrame) -> pd.DataFrame:
     race = get_round_info(season, round_no)
     circuit_id = race.get("Circuit", {}).get("circuitId")
@@ -142,8 +150,14 @@ def build_features(season: int, round_no: int, hist_df: pd.DataFrame) -> pd.Data
             cons_rank = None
         cons_points = float(cs.get("points", 0.0))
 
-        momentum = compute_momentum(driver_hist.get(drv, []))
-        cons_momentum = compute_momentum(cons_hist.get(constructor, []))
+        drv_hist = driver_hist.get(drv, [])
+        cons_hist_list = cons_hist.get(constructor, [])
+
+        last3_perf = compute_last3_performance(drv_hist)
+        cons_last3_perf = compute_last3_performance(cons_hist_list)
+
+        momentum = compute_momentum(drv_hist)
+        cons_momentum = compute_momentum(cons_hist_list)
 
         rows.append(
             dict(
@@ -165,7 +179,9 @@ def build_features(season: int, round_no: int, hist_df: pd.DataFrame) -> pd.Data
                 rqtd_sec=gap_sec,
                 rqtd_pct=gap_pct,
                 teammate_quali_gap_sec=teammate_gap,
+                driver_last3_performance=last3_perf,
                 driver_momentum=momentum,
+                constructor_last3_performance=cons_last3_perf,
                 constructor_momentum=cons_momentum,
                 pit_stop_difficulty=mean_psd,
                 temp_mean=weather.get("temp_mean"),
