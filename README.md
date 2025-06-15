@@ -103,3 +103,11 @@ rec: 0.750 ± 0.273
 f1: 0.691 ± 0.165
 auc: 0.961 ± 0.012
 ```
+
+## Hyper-parameter Tuning
+
+`tune_catboost_optuna_cpu.py` and `tune_catboost_optuna_gpu.py` search for the
+best CatBoost parameters using a time-series split to respect race order. After
+updating `f1_data_2022_to_present.csv`, re-run one of these scripts to obtain
+fresh parameters before training the final model. `threshold_scan_final.py`
+uses the same time-series folds when scanning decision thresholds.
