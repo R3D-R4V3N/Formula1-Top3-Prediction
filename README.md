@@ -82,3 +82,24 @@ python predict_top3.py --season 2025 --round 9
 ```
 
 The command above predicts the Spanish Grand Prix (round 9) for the 2025 season.
+
+## Model Evaluation
+
+`model_catboost_final.py` now uses a time-series split that trains on past races
+and tests on later events. Running the script prints cross-validation metrics
+similar to:
+
+```
+[Fold 1] acc=0.883  prec=1.000  rec=0.222  f1=0.364  auc=0.956
+[Fold 2] acc=0.917  prec=0.690  rec=0.806  f1=0.744  auc=0.946
+[Fold 3] acc=0.933  prec=0.700  rec=0.972  f1=0.814  auc=0.980
+[Fold 4] acc=0.925  prec=0.725  rec=0.806  f1=0.763  auc=0.956
+[Fold 5] acc=0.916  prec=0.654  rec=0.944  f1=0.773  auc=0.967
+
+=== Tuned CatBoost Results (mean ± std) ===
+acc: 0.915 ± 0.017
+prec: 0.754 ± 0.125
+rec: 0.750 ± 0.273
+f1: 0.691 ± 0.165
+auc: 0.961 ± 0.012
+```
