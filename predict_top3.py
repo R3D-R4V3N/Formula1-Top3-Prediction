@@ -85,7 +85,11 @@ def build_features(season: int, round_no: int, hist_df: pd.DataFrame) -> pd.Data
         .to_dict()
     )
 
-    mean_psd = hist_df["pit_stop_difficulty"].mean()
+    circuit_psd = hist_df.loc[
+        hist_df["circuit_id"] == circuit_id, "pit_stop_difficulty"
+    ].mean()
+    overall_psd = hist_df["pit_stop_difficulty"].mean()
+    mean_psd = circuit_psd if not pd.isna(circuit_psd) else overall_psd
     weather = fetch_weather(season, round_no)
 
     rows = []

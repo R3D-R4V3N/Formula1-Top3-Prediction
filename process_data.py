@@ -102,6 +102,9 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
     circuit_podiums = {}
     constructor_counts = {}
     constructor_podiums = {}
+    # Track total pit stop duration and count by circuit to compute
+    # historical average pit stop difficulty without using the current race
+    circuit_pit_stats = {}
 
     with open(output_file, mode, newline="", encoding="utf-8") as csvfile:
         writer = csv.writer(csvfile)
@@ -192,15 +195,18 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                     team_id = res["Constructor"]["constructorId"]
                     team_map.setdefault(team_id, []).append(drv_id)
 
+                # Historical mean pit stop duration for this circuit based on
+                # previously processed races
+                stat = circuit_pit_stats.get(circuit_id)
+                pit_stop_difficulty = (
+                    stat[0] / stat[1] if stat and stat[1] > 0 else None
+                )
+
                 pit_durations = []
                 for p in data.get("pitstops", []):
                     dur = parse_pit_duration(p.get("duration"))
                     if dur is not None:
                         pit_durations.append(dur)
-                pit_stop_difficulty = None
-                if pit_durations:
-                    avg_dur = sum(pit_durations) / len(pit_durations)
-                    pit_stop_difficulty = len(pit_durations) * avg_dur
 
                 weather = load_weather(season, round_no)
 
@@ -343,6 +349,12 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                         if finish_pos <= 3:
                             circuit_podiums[circuit_id] = circ_pods + 1
                             constructor_podiums[constructor] = cons_pods + 1
+
+                # Update historical pit stop statistics after processing the race
+                if pit_durations:
+                    stats = circuit_pit_stats.setdefault(circuit_id, [0.0, 0])
+                    stats[0] += sum(pit_durations)
+                    stats[1] += len(pit_durations)
 
                 log(f"✅ stored {len(results)} results for {season} round {round_no}")
                 round_no += 1
