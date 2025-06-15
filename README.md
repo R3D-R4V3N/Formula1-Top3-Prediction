@@ -82,3 +82,7 @@ python predict_top3.py --season 2025 --round 9
 ```
 
 The command above predicts the Spanish Grand Prix (round 9) for the 2025 season.
+
+## Feature Importance Notebook
+A Jupyter notebook `feature_importance.ipynb` demonstrates multiple methods for analyzing feature importance including SHAP values, CatBoost internal metrics and permutation importance.
+
