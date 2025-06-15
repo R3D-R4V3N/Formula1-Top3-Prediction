@@ -250,26 +250,22 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                         teammate_gap = 5.0
 
                     points_total = try_float(ds.get("points"))
-                    history = points_history.setdefault(driver, [])
-                    history.append(points_total if points_total is not None else 0.0)
-                    momentum = None
+                    history = points_history.setdefault(driver, [0.0])
+                    momentum = 0.0
                     if len(history) >= 7:
                         last3 = history[-1] - history[-4]
                         prev3 = history[-4] - history[-7]
                         momentum = last3 - prev3
-                    else:
-                        momentum = 0.0
+                    history.append(points_total if points_total is not None else 0.0)
 
                     cons_points = try_float(cs.get("points"))
-                    cons_hist = constructor_points_history.setdefault(constructor, [])
-                    cons_hist.append(cons_points if cons_points is not None else 0.0)
-                    cons_momentum = None
+                    cons_hist = constructor_points_history.setdefault(constructor, [0.0])
+                    cons_momentum = 0.0
                     if len(cons_hist) >= 7:
                         last3_c = cons_hist[-1] - cons_hist[-4]
                         prev3_c = cons_hist[-4] - cons_hist[-7]
                         cons_momentum = last3_c - prev3_c
-                    else:
-                        cons_momentum = 0.0
+                    cons_hist.append(cons_points if cons_points is not None else 0.0)
 
                     gap_sec = (
                         best_times.get(driver) - pole_time
