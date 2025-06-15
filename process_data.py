@@ -1,6 +1,7 @@
 """Prepare a CSV dataset from cached Jolpica F1 race data."""
 
 import csv
+import json
 import os
 from datetime import datetime
 
@@ -76,6 +77,16 @@ def get_last_round(csv_file: str):
     return None
 
 
+
+def load_weather(season: int, round_no: int):
+    """Load cached weather features for a race."""
+    cache_file = os.path.join("weather_cache", f"weather_{season}_{round_no}.json")
+    if os.path.exists(cache_file):
+        with open(cache_file, encoding="utf-8") as f:
+            return json.load(f)
+    return {}
+
+
 def prepare_dataset(start_season: int, end_season: int, output_file: str):
     """Prepare CSV data for the given seasons using cached raw data."""
 
@@ -118,6 +129,10 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                 "driver_momentum",
                 "constructor_momentum",
                 "pit_stop_difficulty",
+                "temp_mean",
+                "precip_sum",
+                "humidity_mean",
+                "wind_mean",
             ])
 
         if last:
@@ -184,6 +199,8 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                 if pit_durations:
                     avg_dur = sum(pit_durations) / len(pit_durations)
                     pit_stop_difficulty = len(pit_durations) * avg_dur
+
+                weather = load_weather(season, round_no)
 
                 # Convert standings to dicts for quick lookup
                 ds_map = {d["Driver"]["driverId"]: d for d in driver_standings}
@@ -290,6 +307,10 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                         momentum,
                         cons_momentum,
                         pit_stop_difficulty,
+                        weather.get("temp_mean"),
+                        weather.get("precip_sum"),
+                        weather.get("humidity_mean"),
+                        weather.get("wind_mean"),
                     ])
 
                     # Update statistics after writing row

@@ -1,13 +1,13 @@
 """
 Final CatBoost model for predicting top‑3 podium finishes in Formula 1.
 
-Hyper‑parameters tuned via Optuna (best trial #374):
-    iterations          = 3030
-    learning_rate       = 0.017314873309802203
+Hyper‑parameters tuned via Optuna (latest weather‑features run):
+    iterations          = 2223
+    learning_rate       = 0.015024003619164828
     depth               = 6
-    l2_leaf_reg         = 2
-    bagging_temperature = 0.44734932940317557
-    decision_threshold  = 0.5943698932453211
+    l2_leaf_reg         = 4
+    bagging_temperature = 0.20074625051179276
+    decision_threshold  = 0.5887412074833219
 
 Performance target: F1 ≥ 0.80 and recall ≥ 0.90 (5‑fold GroupKFold)
 
@@ -30,14 +30,14 @@ from sklearn.metrics import (
 )
 
 # -------------------- Config --------------------
-THRESHOLD = 0.5943698932453211  # tuned decision cutoff
+THRESHOLD = 0.5887412074833219  # tuned decision cutoff
 
 MODEL_PARAMS = dict(
-    iterations=3030,
-    learning_rate=0.017314873309802203,
+    iterations=2223,
+    learning_rate=0.015024003619164828,
     depth=6,
-    l2_leaf_reg=2,
-    bagging_temperature=0.44734932940317557,
+    l2_leaf_reg=4,
+    bagging_temperature=0.20074625051179276,
     loss_function="Logloss",
     eval_metric="AUC",
     random_seed=42,
@@ -68,7 +68,7 @@ for fold, (train_idx, test_idx) in enumerate(gkf.split(X, y, groups), 1):
     model = CatBoostClassifier(**MODEL_PARAMS)
 
     train_pool = Pool(X.iloc[train_idx], y[train_idx], cat_features=cat_idx)
-    valid_pool = Pool(X.iloc[test_idx], y[test_idx], cat_features=cat_idx)
+    valid_pool = Pool(X.iloc[test_idx],  y[test_idx],  cat_features=cat_idx)
 
     model.fit(train_pool, eval_set=valid_pool, early_stopping_rounds=300)
 
