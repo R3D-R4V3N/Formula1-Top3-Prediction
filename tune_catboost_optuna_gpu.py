@@ -7,6 +7,8 @@ Run:
 
 import argparse, optuna, numpy as np, pandas as pd
 from pathlib import Path
+
+from feature_utils import add_overtaking_difficulty
 from catboost import CatBoostClassifier, Pool
 from sklearn.model_selection import GroupKFold
 from sklearn.metrics import f1_score
@@ -18,6 +20,7 @@ args = parser.parse_args()
 
 # ---------- Data ----------
 df = pd.read_csv(Path(__file__).with_name('f1_data_2022_to_present.csv'))
+df = add_overtaking_difficulty(df)
 df['top3_flag'] = (df.finishing_position <= 3).astype(int)
 df['group'] = df.season_year.astype(str) + '-' + df.round_number.astype(str)
 X = df.drop(columns=['finishing_position', 'top3_flag', 'group'])
