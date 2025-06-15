@@ -85,6 +85,17 @@ def build_features(season: int, round_no: int, hist_df: pd.DataFrame) -> pd.Data
         .to_dict()
     )
 
+    circuit_stats = (
+        hist_df.groupby("circuit_id")["top3_flag"]
+        .agg(["sum", "count"])
+        .to_dict("index")
+    )
+    constructor_stats = (
+        hist_df.groupby("constructor_id")["top3_flag"]
+        .agg(["sum", "count"])
+        .to_dict("index")
+    )
+
     mean_psd = hist_df["pit_stop_difficulty"].mean()
     weather = fetch_weather(season, round_no)
 
@@ -159,6 +170,15 @@ def build_features(season: int, round_no: int, hist_df: pd.DataFrame) -> pd.Data
         momentum = compute_momentum(drv_hist)
         cons_momentum = compute_momentum(cons_hist_list)
 
+        circ_stat = circuit_stats.get(circuit_id, {"sum": 0, "count": 0})
+        circuit_podium_rate = (
+            circ_stat["sum"] / circ_stat["count"] if circ_stat["count"] else 0.0
+        )
+        cons_stat = constructor_stats.get(constructor, {"sum": 0, "count": 0})
+        constructor_podium_rate = (
+            cons_stat["sum"] / cons_stat["count"] if cons_stat["count"] else 0.0
+        )
+
         rows.append(
             dict(
                 season_year=season,
@@ -183,6 +203,8 @@ def build_features(season: int, round_no: int, hist_df: pd.DataFrame) -> pd.Data
                 driver_momentum=momentum,
                 constructor_last3_performance=cons_last3_perf,
                 constructor_momentum=cons_momentum,
+                circuit_podium_rate=circuit_podium_rate,
+                constructor_podium_rate=constructor_podium_rate,
                 pit_stop_difficulty=mean_psd,
                 temp_mean=weather.get("temp_mean"),
                 precip_sum=weather.get("precip_sum"),
