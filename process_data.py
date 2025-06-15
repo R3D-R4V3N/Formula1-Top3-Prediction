@@ -241,6 +241,8 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                 ds_map = {d["Driver"]["driverId"]: d for d in driver_standings}
                 cs_map = {c["Constructor"]["constructorId"]: c for c in cons_standings}
 
+                pending_driver_updates = []
+                pending_constructor_updates = {}
                 for result in results:
                     driver = result["Driver"]["driverId"]
                     constructor = result["Constructor"]["constructorId"]
@@ -334,11 +336,11 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                         weather.get("wind_mean"),
                     ])
 
-                    # Update momentum histories with post-race points
+                    # Track which drivers and constructors need history updates
                     post_pts = try_float(ds_after.get(driver, {}).get("points"))
-                    history.append(post_pts if post_pts is not None else 0.0)
+                    pending_driver_updates.append((driver, post_pts))
                     cons_post = try_float(cs_after.get(constructor, {}).get("points"))
-                    cons_hist.append(cons_post if cons_post is not None else 0.0)
+                    pending_constructor_updates[constructor] = cons_post
 
                     # Update statistics after writing row
                     if finish_pos is not None:
@@ -347,6 +349,12 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                         if finish_pos <= 3:
                             circuit_podiums[circuit_id] = circ_pods + 1
                             constructor_podiums[constructor] = cons_pods + 1
+
+                # Apply pending history updates after processing all drivers
+                for drv, pts in pending_driver_updates:
+                    points_history.setdefault(drv, []).append(pts if pts is not None else 0.0)
+                for cons, pts in pending_constructor_updates.items():
+                    constructor_points_history.setdefault(cons, []).append(pts if pts is not None else 0.0)
 
                 if pit_stop_difficulty is not None:
                     total = circuit_pit_totals.get(circuit_id, 0.0)
