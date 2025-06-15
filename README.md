@@ -4,7 +4,7 @@ This repository contains utilities to download Formula 1 race data using the Jol
 
 ## Data Collection
 
-Raw responses are downloaded with `fetch_data.py` and stored under `jolpica_f1_cache/<season>/<round>.json`. `process_data.py` reads the cache and builds `f1_data_2022_to_present.csv`. A helper script `data_collection.py` runs both steps. The processed data includes:
+ Raw responses are downloaded with `fetch_data.py` and stored under `jolpica_f1_cache/<season>/<round>.json`. `process_data.py` reads the cache and builds `f1_data_2022_to_present.csv`. Weather data is cached under `weather_cache/` as JSON. A helper script `data_collection.py` runs both steps. The processed data includes:
 
 - circuit ID
 - start position on the grid
@@ -22,6 +22,10 @@ Raw responses are downloaded with `fetch_data.py` and stored under `jolpica_f1_c
 - driver momentum over the last three races (0.0 for the first six rounds)
 - constructor momentum over the last three races (0.0 for the first six rounds)
 - pit stop difficulty index
+- mean temperature during the race window
+- total precipitation during the race window
+- mean humidity during the race window
+- mean wind speed during the race window
 
 The script writes the prepared dataset to `f1_data_2022_to_present.csv` in the current directory.
 
@@ -29,11 +33,13 @@ The script writes the prepared dataset to `f1_data_2022_to_present.csv` in the c
 
 - Python 3.8+
 - `requests` library
+- `meteostat`
+- `pyowm` (optional, for weather forecasts)
 
-Install the dependency with:
+Install the dependencies with:
 
 ```bash
-pip install requests
+pip install requests meteostat pyowm
 ```
 
 ### Usage
