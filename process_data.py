@@ -255,7 +255,7 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                     history = points_history.setdefault(driver, [])
 
                     # average points scored in the previous 3 races (leakage-safe)
-                    if len(history) >= 3:
+                    if len(history) >= 4:
                         last3_perf = (history[-1] - history[-4]) / 3
                     elif history:
                         last3_perf = (history[-1] - history[0]) / len(history)
@@ -275,7 +275,7 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                     cons_points = try_float(cs.get("points"))
                     cons_hist = constructor_points_history.setdefault(constructor, [])
 
-                    if len(cons_hist) >= 3:
+                    if len(cons_hist) >= 4:
                         cons_last3_perf = (cons_hist[-1] - cons_hist[-4]) / 3
                     elif cons_hist:
                         cons_last3_perf = (cons_hist[-1] - cons_hist[0]) / len(cons_hist)
