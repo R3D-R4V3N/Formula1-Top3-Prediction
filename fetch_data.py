@@ -3,7 +3,7 @@
 import json
 import os
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 
 import requests
 from meteostat import Hourly, Point
@@ -159,7 +159,7 @@ def fetch_weather(season: int, round_no: int):
     start = datetime(race_day.year, race_day.month, race_day.day, 12)
     end = datetime(race_day.year, race_day.month, race_day.day, 14)
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     features = {
         "temp_mean": None,
         "precip_sum": None,
