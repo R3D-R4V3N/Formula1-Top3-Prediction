@@ -102,6 +102,8 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
     circuit_podiums = {}
     constructor_counts = {}
     constructor_podiums = {}
+    circuit_pit_totals = {}
+    circuit_pit_counts = {}
 
     with open(output_file, mode, newline="", encoding="utf-8") as csvfile:
         writer = csv.writer(csvfile)
@@ -156,6 +158,12 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                 driver_standings = data["driver_standings"]
                 cons_standings = data["constructor_standings"]
                 qual_results = data["qualifying"]
+
+                pit_feature = None
+                if circuit_pit_counts.get(circuit_id):
+                    pit_feature = (
+                        circuit_pit_totals[circuit_id] / circuit_pit_counts[circuit_id]
+                    )
 
                 # Map best qualifying times in seconds
                 best_times = {}
@@ -306,7 +314,7 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                         teammate_gap,
                         momentum,
                         cons_momentum,
-                        pit_stop_difficulty,
+                        pit_feature,
                         weather.get("temp_mean"),
                         weather.get("precip_sum"),
                         weather.get("humidity_mean"),
@@ -320,6 +328,12 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                         if finish_pos <= 3:
                             circuit_podiums[circuit_id] = circ_pods + 1
                             constructor_podiums[constructor] = cons_pods + 1
+
+                if pit_stop_difficulty is not None:
+                    total = circuit_pit_totals.get(circuit_id, 0.0)
+                    count = circuit_pit_counts.get(circuit_id, 0)
+                    circuit_pit_totals[circuit_id] = total + pit_stop_difficulty
+                    circuit_pit_counts[circuit_id] = count + 1
 
                 log(f"✅ stored {len(results)} results for {season} round {round_no}")
                 round_no += 1
