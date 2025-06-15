@@ -9,6 +9,7 @@ from fetch_data import (
     get_driver_standings,
     get_constructor_standings,
     get_round_info,
+    fetch_weather,
 )
 from process_data import parse_qual_time
 from model_catboost_final import MODEL_PARAMS, THRESHOLD
@@ -77,6 +78,7 @@ def build_features(season: int, round_no: int, hist_df: pd.DataFrame) -> pd.Data
     )
 
     mean_psd = hist_df["pit_stop_difficulty"].mean()
+    weather = fetch_weather(season, round_no)
 
     rows = []
     for res in results:
@@ -166,6 +168,10 @@ def build_features(season: int, round_no: int, hist_df: pd.DataFrame) -> pd.Data
                 driver_momentum=momentum,
                 constructor_momentum=cons_momentum,
                 pit_stop_difficulty=mean_psd,
+                temp_mean=weather.get("temp_mean"),
+                precip_sum=weather.get("precip_sum"),
+                humidity_mean=weather.get("humidity_mean"),
+                wind_mean=weather.get("wind_mean"),
             )
         )
 
@@ -201,6 +207,8 @@ def main() -> None:
     model.fit(train_pool)
 
     features = build_features(args.season, args.round, train_df)
+    # Ensure prediction features align with training column order
+    features = features[X.columns]
     preds = model.predict_proba(Pool(features, cat_features=cat_idx))[:, 1]
     features["prob"] = preds
     top3 = features.sort_values("prob", ascending=False).head(3)["driver_id"].tolist()
