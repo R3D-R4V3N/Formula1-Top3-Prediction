@@ -7,7 +7,11 @@ from datetime import datetime
 
 import requests
 from meteostat import Hourly, Point
-from pyowm.owm import OWM
+try:
+    from pyowm.owm import OWM
+except Exception:  # pragma: no cover - optional dependency may be missing
+    OWM = None
+from pytz import timezone
 
 BASE_URL = "https://api.jolpi.ca/ergast/f1"
 CACHE_DIR = "jolpica_f1_cache"
@@ -156,8 +160,17 @@ def fetch_weather(season: int, round_no: int):
     date_str = race_info.get("date")
     race_day = datetime.fromisoformat(date_str)
 
-    start = datetime(race_day.year, race_day.month, race_day.day, 12)
-    end = datetime(race_day.year, race_day.month, race_day.day, 14)
+    local = timezone("Europe/Brussels")
+    start = (
+        local.localize(datetime(race_day.year, race_day.month, race_day.day, 12, 0))
+        .astimezone(timezone("UTC"))
+        .replace(tzinfo=None)
+    )
+    end = (
+        local.localize(datetime(race_day.year, race_day.month, race_day.day, 14, 0))
+        .astimezone(timezone("UTC"))
+        .replace(tzinfo=None)
+    )
 
     now = datetime.utcnow()
     features = {
@@ -181,8 +194,8 @@ def fetch_weather(season: int, round_no: int):
                     "wind_mean": float(df_w["wspd"].mean()),
                 }
         else:
-            api_key = os.getenv("d2bc9fb8d94c258d06149c087ccd4892")
-            if api_key:
+            api_key = os.getenv("OWM_API_KEY")
+            if OWM and api_key:
                 owm = OWM(api_key)
                 mgr = owm.weather_manager()
                 fc = mgr.forecast_hourly(lat=lat, lon=lon)
