@@ -5,7 +5,12 @@ import json
 import os
 from datetime import datetime
 
-from fetch_data import fetch_round_data, log
+from fetch_data import (
+    fetch_round_data,
+    log,
+    get_driver_standings,
+    get_constructor_standings,
+)
 
 
 def parse_qual_time(time_str: str):
@@ -55,6 +60,16 @@ def parse_pit_duration(value: str):
         return float(value)
     except ValueError:
         return None
+
+
+def compute_momentum(history):
+    """Return momentum based on previous points totals."""
+    if len(history) >= 6:
+        last3 = history[-1] - history[-4]
+        base = history[-7] if len(history) >= 7 else 0.0
+        prev3 = history[-4] - base
+        return last3 - prev3
+    return 0.0
 
 
 def get_last_round(csv_file: str):
@@ -153,8 +168,20 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                     break
                 circuit_id = data["circuit_id"]
                 results = data["results"]
-                driver_standings = data["driver_standings"]
-                cons_standings = data["constructor_standings"]
+                # Standings after the previous round for feature computation
+                if round_no > 1:
+                    driver_standings = get_driver_standings(season, round_no - 1)
+                    cons_standings = get_constructor_standings(season, round_no - 1)
+                else:
+                    driver_standings = []
+                    cons_standings = []
+
+                # Standings after the current round for updating histories
+                ds_after = {d["Driver"]["driverId"]: d for d in data["driver_standings"]}
+                cs_after = {
+                    c["Constructor"]["constructorId"]: c
+                    for c in data["constructor_standings"]
+                }
                 qual_results = data["qualifying"]
 
                 # Map best qualifying times in seconds
@@ -249,27 +276,13 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                     if teammate_gap is None:
                         teammate_gap = 5.0
 
-                    points_total = try_float(ds.get("points"))
+                    points_prev = try_float(ds.get("points", 0.0))
                     history = points_history.setdefault(driver, [])
-                    history.append(points_total if points_total is not None else 0.0)
-                    momentum = None
-                    if len(history) >= 7:
-                        last3 = history[-1] - history[-4]
-                        prev3 = history[-4] - history[-7]
-                        momentum = last3 - prev3
-                    else:
-                        momentum = 0.0
+                    momentum = compute_momentum(history)
 
-                    cons_points = try_float(cs.get("points"))
+                    cons_points_prev = try_float(cs.get("points", 0.0))
                     cons_hist = constructor_points_history.setdefault(constructor, [])
-                    cons_hist.append(cons_points if cons_points is not None else 0.0)
-                    cons_momentum = None
-                    if len(cons_hist) >= 7:
-                        last3_c = cons_hist[-1] - cons_hist[-4]
-                        prev3_c = cons_hist[-4] - cons_hist[-7]
-                        cons_momentum = last3_c - prev3_c
-                    else:
-                        cons_momentum = 0.0
+                    cons_momentum = compute_momentum(cons_hist)
 
                     gap_sec = (
                         best_times.get(driver) - pole_time
@@ -296,10 +309,10 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                         bonus_flag,
                         qual_flags.get(driver, (0, 0))[0],
                         qual_flags.get(driver, (0, 0))[1],
-                        try_float(ds.get("points")),
+                        points_prev,
                         rank,
                         constructor,
-                        try_float(cs.get("points")),
+                        cons_points_prev,
                         try_int(cs.get("position")),
                         gap_sec,
                         gap_pct,
@@ -312,6 +325,12 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                         weather.get("humidity_mean"),
                         weather.get("wind_mean"),
                     ])
+
+                    # Update momentum histories with post-race points
+                    post_pts = try_float(ds_after.get(driver, {}).get("points"))
+                    history.append(post_pts if post_pts is not None else 0.0)
+                    cons_post = try_float(cs_after.get(constructor, {}).get("points"))
+                    cons_hist.append(cons_post if cons_post is not None else 0.0)
 
                     # Update statistics after writing row
                     if finish_pos is not None:
