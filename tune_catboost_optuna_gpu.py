@@ -20,7 +20,16 @@ args = parser.parse_args()
 df = pd.read_csv(Path(__file__).with_name('f1_data_2022_to_present.csv'))
 df['top3_flag'] = (df.finishing_position <= 3).astype(int)
 df['group'] = df.season_year.astype(str) + '-' + df.round_number.astype(str)
-X = df.drop(columns=['finishing_position', 'top3_flag', 'group'])
+X = df.drop(
+    columns=[
+        'finishing_position',
+        'top3_flag',
+        'group',
+        'grid_penalty_places',
+        'grid_penalty_flag',
+        'grid_bonus_flag',
+    ]
+)
 y = df.top3_flag.values
 groups = df.group.values
 cat_idx = [X.columns.get_loc(c) for c in ['circuit_id', 'driver_id', 'constructor_id']]
