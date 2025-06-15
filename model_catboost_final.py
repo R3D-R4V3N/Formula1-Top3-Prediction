@@ -53,7 +53,16 @@ df["top3_flag"] = (df["finishing_position"] <= 3).astype(int)
 df = df.sort_values(["season_year", "round_number"]).reset_index(drop=True)
 df["group"] = df["season_year"].astype(str) + "-" + df["round_number"].astype(str)
 
-X = df.drop(columns=["finishing_position", "top3_flag", "group"])
+X = df.drop(
+    columns=[
+        "finishing_position",
+        "top3_flag",
+        "group",
+        "grid_penalty_places",
+        "grid_penalty_flag",
+        "grid_bonus_flag",
+    ]
+)
 y = df["top3_flag"].values
 groups = df["group"].values  # used only to build time‑series folds
 unique_groups = df["group"].unique()

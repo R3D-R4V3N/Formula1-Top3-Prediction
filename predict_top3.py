@@ -152,9 +152,6 @@ def build_features(season: int, round_no: int, hist_df: pd.DataFrame) -> pd.Data
                 circuit_id=circuit_id,
                 driver_id=drv,
                 starting_grid_position=grid_pos,
-                grid_penalty_places=penalty_places,
-                grid_penalty_flag=penalty_flag,
-                grid_bonus_flag=bonus_flag,
                 q2_flag=q2_flag,
                 q3_flag=q3_flag,
                 driver_points_scored=driver_points,
@@ -194,7 +191,16 @@ def main() -> None:
         | ((df["season_year"] == args.season) & (df["round_number"] < args.round))
     ]
 
-    X = train_df.drop(columns=["finishing_position", "top3_flag", "group"])
+    X = train_df.drop(
+        columns=[
+            "finishing_position",
+            "top3_flag",
+            "group",
+            "grid_penalty_places",
+            "grid_penalty_flag",
+            "grid_bonus_flag",
+        ]
+    )
     y = train_df["top3_flag"].values
     cat_cols = ["circuit_id", "driver_id", "constructor_id"]
     cat_idx = [X.columns.get_loc(c) for c in cat_cols]

@@ -15,7 +15,15 @@ def load_data() -> tuple[pd.DataFrame, pd.Series, list[int]]:
     df = pd.read_csv(csv_path)
     df["top3_flag"] = (df["finishing_position"] <= 3).astype(int)
 
-    X = df.drop(columns=["finishing_position", "top3_flag"])
+    X = df.drop(
+        columns=[
+            "finishing_position",
+            "top3_flag",
+            "grid_penalty_places",
+            "grid_penalty_flag",
+            "grid_bonus_flag",
+        ]
+    )
     y = df["top3_flag"]
     cat_cols = ["circuit_id", "driver_id", "constructor_id"]
     cat_idx = [X.columns.get_loc(c) for c in cat_cols]
