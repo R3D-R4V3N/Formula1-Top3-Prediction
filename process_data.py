@@ -126,7 +126,9 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                 "rqtd_sec",
                 "rqtd_pct",
                 "teammate_quali_gap_sec",
+                "driver_last3_performance",
                 "driver_momentum",
+                "constructor_last3_performance",
                 "constructor_momentum",
                 "pit_stop_difficulty",
                 "temp_mean",
@@ -251,7 +253,17 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
 
                     points_total = try_float(ds.get("points"))
                     history = points_history.setdefault(driver, [])
+
+                    # average points scored in the previous 3 races (leakage-safe)
+                    if len(history) >= 4:
+                        last3_perf = (history[-1] - history[-4]) / 3
+                    elif history:
+                        last3_perf = (history[-1] - history[0]) / len(history)
+                    else:
+                        last3_perf = 0.0
+
                     history.append(points_total if points_total is not None else 0.0)
+
                     momentum = None
                     if len(history) >= 7:
                         last3 = history[-1] - history[-4]
@@ -262,7 +274,16 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
 
                     cons_points = try_float(cs.get("points"))
                     cons_hist = constructor_points_history.setdefault(constructor, [])
+
+                    if len(cons_hist) >= 4:
+                        cons_last3_perf = (cons_hist[-1] - cons_hist[-4]) / 3
+                    elif cons_hist:
+                        cons_last3_perf = (cons_hist[-1] - cons_hist[0]) / len(cons_hist)
+                    else:
+                        cons_last3_perf = 0.0
+
                     cons_hist.append(cons_points if cons_points is not None else 0.0)
+
                     cons_momentum = None
                     if len(cons_hist) >= 7:
                         last3_c = cons_hist[-1] - cons_hist[-4]
@@ -304,7 +325,9 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                         gap_sec,
                         gap_pct,
                         teammate_gap,
+                        last3_perf,
                         momentum,
+                        cons_last3_perf,
                         cons_momentum,
                         pit_stop_difficulty,
                         weather.get("temp_mean"),

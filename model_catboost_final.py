@@ -16,6 +16,13 @@ Usage:
 
 Dependencies:
     pip install catboost scikit‑learn pandas numpy
+
+
+    Best trial: 121. Best value: 0.828142: 100%|████████████████████████████████████████████████████████████████████████████████████████| 400/400 [1:20:38<00:00, 12.10s/it]
+Best F1: 0.8281424619500234
+Best parameters:
+{'iterations': 2871, 'lr': 0.04562949382822975, 'depth': 6, 'l2': 8, 'bag_temp': 0.995529172657803, 'thr': 0.6048543765126713}
+jasper@jasper-XPS-15-9530:~/Documents/Github/Formula1-Top3-Prediction$ 
 """
 
 import numpy as np
@@ -30,14 +37,14 @@ from sklearn.metrics import (
 )
 
 # -------------------- Config --------------------
-THRESHOLD = 0.5887412074833219  # tuned decision cutoff
+THRESHOLD = 0.6048543765126713  # tuned decision cutoff
 
 MODEL_PARAMS = dict(
-    iterations=2223,
-    learning_rate=0.015024003619164828,
+    iterations=2871,
+    learning_rate=0.04562949382822975,
     depth=6,
-    l2_leaf_reg=4,
-    bagging_temperature=0.20074625051179276,
+    l2_leaf_reg=8,
+    bagging_temperature=0.995529172657803,
     loss_function="Logloss",
     eval_metric="AUC",
     random_seed=42,
