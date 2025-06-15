@@ -154,10 +154,10 @@ def fetch_weather(season: int, round_no: int):
     lat = float(loc.get("lat"))
     lon = float(loc.get("long"))
     date_str = race_info.get("date")
-    race_day = datetime.fromisoformat(date_str)
+    race_day = datetime.fromisoformat(date_str).replace(tzinfo=timezone.utc)
 
-    start = datetime(race_day.year, race_day.month, race_day.day, 12)
-    end = datetime(race_day.year, race_day.month, race_day.day, 14)
+    start = race_day.replace(hour=12)
+    end = race_day.replace(hour=14)
 
     now = datetime.now(timezone.utc)
     features = {
