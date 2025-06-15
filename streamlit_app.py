@@ -5,13 +5,11 @@ from catboost import CatBoostClassifier, Pool
 
 from predict_top3 import build_features
 from model_catboost_final import MODEL_PARAMS
-from feature_utils import add_overtaking_difficulty
 
 
 def load_history():
     csv_path = Path(__file__).with_name("f1_data_2022_to_present.csv")
     df = pd.read_csv(csv_path)
-    df = add_overtaking_difficulty(df)
     df["top3_flag"] = (df["finishing_position"] <= 3).astype(int)
     df["group"] = df["season_year"].astype(str) + "-" + df["round_number"].astype(str)
     return df

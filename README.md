@@ -22,7 +22,6 @@ Raw responses are downloaded with `fetch_data.py` and stored under `jolpica_f1_c
 - driver momentum over the last three races (0.0 for the first six rounds)
 - constructor momentum over the last three races (0.0 for the first six rounds)
 - pit stop difficulty index
-- overtaking difficulty per circuit
 
 The script writes the prepared dataset to `f1_data_2022_to_present.csv` in the current directory.
 

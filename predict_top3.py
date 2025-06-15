@@ -1,8 +1,6 @@
 import argparse
 from pathlib import Path
 
-from feature_utils import add_overtaking_difficulty
-
 import pandas as pd
 from catboost import CatBoostClassifier, Pool
 
@@ -14,11 +12,6 @@ from fetch_data import (
 )
 from process_data import parse_qual_time
 from model_catboost_final import MODEL_PARAMS, THRESHOLD
-
-OD_PATH = Path(__file__).with_name("overtaking_difficulty.csv")
-OD_DF = pd.read_csv(OD_PATH)
-OD_MAP = OD_DF.set_index("circuit_id")["overtaking_difficulty"].to_dict()
-OD_MEDIAN = float(OD_DF["overtaking_difficulty"].median())
 
 
 def compute_momentum(history):
@@ -84,7 +77,6 @@ def build_features(season: int, round_no: int, hist_df: pd.DataFrame) -> pd.Data
     )
 
     mean_psd = hist_df["pit_stop_difficulty"].mean()
-    overtaking = OD_MAP.get(circuit_id, OD_MEDIAN)
 
     rows = []
     for res in results:
@@ -174,7 +166,6 @@ def build_features(season: int, round_no: int, hist_df: pd.DataFrame) -> pd.Data
                 driver_momentum=momentum,
                 constructor_momentum=cons_momentum,
                 pit_stop_difficulty=mean_psd,
-                overtaking_difficulty=overtaking,
             )
         )
 
@@ -189,7 +180,6 @@ def main() -> None:
 
     csv_path = Path(__file__).with_name("f1_data_2022_to_present.csv")
     df = pd.read_csv(csv_path)
-    df = add_overtaking_difficulty(df)
     df["top3_flag"] = (df["finishing_position"] <= 3).astype(int)
     df["group"] = df["season_year"].astype(str) + "-" + df["round_number"].astype(str)
 
