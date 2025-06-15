@@ -181,7 +181,7 @@ def fetch_weather(season: int, round_no: int):
                     "wind_mean": float(df_w["wspd"].mean()),
                 }
         else:
-            api_key = os.getenv("OWM_API_KEY")
+            api_key = os.getenv("d2bc9fb8d94c258d06149c087ccd4892")
             if api_key:
                 owm = OWM(api_key)
                 mgr = owm.weather_manager()
