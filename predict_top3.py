@@ -66,13 +66,18 @@ def build_features(season: int, round_no: int, hist_df: pd.DataFrame) -> pd.Data
     if valid:
         pole_time = min(valid)
 
-    ds_prev = {
-        d["Driver"]["driverId"]: d for d in get_driver_standings(season, round_no - 1)
-    }
-    cs_prev = {
-        c["Constructor"]["constructorId"]: c
-        for c in get_constructor_standings(season, round_no - 1)
-    }
+    if round_no > 1:
+        ds_prev = {
+            d["Driver"]["driverId"]: d
+            for d in get_driver_standings(season, round_no - 1)
+        }
+        cs_prev = {
+            c["Constructor"]["constructorId"]: c
+            for c in get_constructor_standings(season, round_no - 1)
+        }
+    else:
+        ds_prev = {}
+        cs_prev = {}
 
     driver_hist = (
         hist_df.groupby("driver_id")["driver_points_scored"]

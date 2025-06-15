@@ -157,9 +157,17 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                     break
                 circuit_id = data["circuit_id"]
                 results = data["results"]
-                driver_standings = data["driver_standings"]
-                cons_standings = data["constructor_standings"]
+                driver_standings_curr = data["driver_standings"]
+                cons_standings_curr = data["constructor_standings"]
                 qual_results = data["qualifying"]
+
+                if round_no == 1:
+                    driver_standings_prev = []
+                    cons_standings_prev = []
+                else:
+                    prev = fetch_round_data(season, round_no - 1)
+                    driver_standings_prev = prev.get("driver_standings", [])
+                    cons_standings_prev = prev.get("constructor_standings", [])
 
                 # Map best qualifying times in seconds
                 best_times = {}
@@ -207,21 +215,31 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                 weather = load_weather(season, round_no)
 
                 # Convert standings to dicts for quick lookup
-                ds_map = {d["Driver"]["driverId"]: d for d in driver_standings}
-                cs_map = {c["Constructor"]["constructorId"]: c for c in cons_standings}
+                ds_prev_map = {d["Driver"]["driverId"]: d for d in driver_standings_prev}
+                cs_prev_map = {
+                    c["Constructor"]["constructorId"]: c
+                    for c in cons_standings_prev
+                }
+
+                ds_curr_map = {d["Driver"]["driverId"]: d for d in driver_standings_curr}
+                cs_curr_map = {
+                    c["Constructor"]["constructorId"]: c
+                    for c in cons_standings_curr
+                }
 
                 for result in results:
                     driver = result["Driver"]["driverId"]
                     constructor = result["Constructor"]["constructorId"]
-                    ds = ds_map.get(driver, {})
-                    cs = cs_map.get(constructor, {})
+                    ds = ds_prev_map.get(driver, {})
+                    cs = cs_prev_map.get(constructor, {})
 
                     # Championship rank with fallback to last known value
                     rank = try_int(ds.get("position"))
                     if rank is None:
                         rank = last_driver_rank.get(driver)
-                    else:
-                        last_driver_rank[driver] = rank
+                    post_rank = try_int(ds_curr_map.get(driver, {}).get("position"))
+                    if post_rank is not None:
+                        last_driver_rank[driver] = post_rank
 
                     # Historical counts for target/mean encoding
                     circ_count = circuit_counts.get(circuit_id, 0)
@@ -253,7 +271,7 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                     if teammate_gap is None:
                         teammate_gap = 5.0
 
-                    points_total = try_float(ds.get("points"))
+                    points_total_prev = try_float(ds.get("points"))
                     history = points_history.setdefault(driver, [])
 
                     # average points scored in the previous 3 races (leakage-safe)
@@ -264,7 +282,10 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                     else:
                         last3_perf = 0.0
 
-                    history.append(points_total if points_total is not None else 0.0)
+                    points_after = try_float(ds_curr_map.get(driver, {}).get("points"))
+                    history.append(
+                        points_after if points_after is not None else (history[-1] if history else 0.0)
+                    )
 
                     momentum = None
                     if len(history) >= 7:
@@ -276,6 +297,7 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
 
                     cons_points = try_float(cs.get("points"))
                     cons_hist = constructor_points_history.setdefault(constructor, [])
+                    cons_points_after = try_float(cs_curr_map.get(constructor, {}).get("points"))
 
                     if len(cons_hist) >= 4:
                         cons_last3_perf = (cons_hist[-1] - cons_hist[-4]) / 3
@@ -284,7 +306,11 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                     else:
                         cons_last3_perf = 0.0
 
-                    cons_hist.append(cons_points if cons_points is not None else 0.0)
+                    cons_hist.append(
+                        cons_points_after
+                        if cons_points_after is not None
+                        else (cons_hist[-1] if cons_hist else 0.0)
+                    )
 
                     cons_momentum = None
                     if len(cons_hist) >= 7:
