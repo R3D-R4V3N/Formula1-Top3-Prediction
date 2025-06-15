@@ -102,6 +102,9 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
     circuit_podiums = {}
     constructor_counts = {}
     constructor_podiums = {}
+    # Track historical podium success for each driver on each circuit
+    driver_circuit_counts = {}
+    driver_circuit_podiums = {}
 
     with open(output_file, mode, newline="", encoding="utf-8") as csvfile:
         writer = csv.writer(csvfile)
@@ -133,6 +136,7 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                 "precip_sum",
                 "humidity_mean",
                 "wind_mean",
+                "driver_circuit_success_rate",
             ])
 
         if last:
@@ -271,6 +275,11 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                     else:
                         cons_momentum = 0.0
 
+                    dc_key = (driver, circuit_id)
+                    dc_count = driver_circuit_counts.get(dc_key, 0)
+                    dc_pods = driver_circuit_podiums.get(dc_key, 0)
+                    driver_rate = dc_pods / dc_count if dc_count else 0.0
+
                     gap_sec = (
                         best_times.get(driver) - pole_time
                         if best_times.get(driver) is not None and pole_time is not None
@@ -311,15 +320,18 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                         weather.get("precip_sum"),
                         weather.get("humidity_mean"),
                         weather.get("wind_mean"),
+                        driver_rate,
                     ])
 
                     # Update statistics after writing row
                     if finish_pos is not None:
                         circuit_counts[circuit_id] = circ_count + 1
                         constructor_counts[constructor] = cons_count + 1
+                        driver_circuit_counts[dc_key] = dc_count + 1
                         if finish_pos <= 3:
                             circuit_podiums[circuit_id] = circ_pods + 1
                             constructor_podiums[constructor] = cons_pods + 1
+                            driver_circuit_podiums[dc_key] = dc_pods + 1
 
                 log(f"✅ stored {len(results)} results for {season} round {round_no}")
                 round_no += 1

@@ -24,6 +24,10 @@ def compute_momentum(history):
 
 
 def build_features(season: int, round_no: int, hist_df: pd.DataFrame) -> pd.DataFrame:
+    drv_circ_rate = (
+        hist_df.groupby(["driver_id", "circuit_id"])["top3_flag"].mean().to_dict()
+    )
+
     race = get_round_info(season, round_no)
     circuit_id = race.get("Circuit", {}).get("circuitId")
 
@@ -172,6 +176,7 @@ def build_features(season: int, round_no: int, hist_df: pd.DataFrame) -> pd.Data
                 precip_sum=weather.get("precip_sum"),
                 humidity_mean=weather.get("humidity_mean"),
                 wind_mean=weather.get("wind_mean"),
+                driver_circuit_success_rate=drv_circ_rate.get((drv, circuit_id), 0.0),
             )
         )
 
