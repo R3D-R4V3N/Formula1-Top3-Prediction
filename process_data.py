@@ -7,6 +7,17 @@ from datetime import datetime
 
 from fetch_data import fetch_round_data, log
 
+# window size for computing DNF rates
+DNF_WINDOW = 5
+
+
+def is_dnf(status: str) -> bool:
+    """Return True if the given status indicates a retirement."""
+    if not status:
+        return True
+    status = status.lower()
+    return not ("finished" in status or "lap" in status)
+
 
 def parse_qual_time(time_str: str):
     """Convert a qualifying lap time 'm:ss.sss' or 'ss.sss' to seconds."""
@@ -113,6 +124,7 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                 "driver_id",
                 "starting_grid_position",
                 "finishing_position",
+                "dnf_flag",
                 "grid_penalty_places",
                 "grid_penalty_flag",
                 "grid_bonus_flag",
@@ -132,6 +144,8 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                 "constructor_momentum",
                 "circuit_podium_rate",
                 "constructor_podium_rate",
+                "driver_dnf_rate",
+                "constructor_dnf_rate",
                 "pit_stop_difficulty",
                 "temp_mean",
                 "precip_sum",
@@ -147,6 +161,9 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
 
         points_history = {}
         constructor_points_history = {}
+        driver_dnf_history = {}
+        constructor_dnf_history = {}
+        circuit_pit_history = {}
 
         for season in range(start_s, end_season + 1):
             round_no = start_r if season == start_s else 1
@@ -207,10 +224,16 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                     dur = parse_pit_duration(p.get("duration"))
                     if dur is not None:
                         pit_durations.append(dur)
-                pit_stop_difficulty = None
+
+                current_psd = None
                 if pit_durations:
                     avg_dur = sum(pit_durations) / len(pit_durations)
-                    pit_stop_difficulty = len(pit_durations) * avg_dur
+                    current_psd = len(pit_durations) * avg_dur
+
+                past_diffs = circuit_pit_history.get(circuit_id, [])
+                pit_stop_difficulty = (
+                    sum(past_diffs) / len(past_diffs) if past_diffs else None
+                )
 
                 weather = load_weather(season, round_no)
 
@@ -340,6 +363,21 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                         cons_pods / cons_count if cons_count else 0.0
                     )
 
+                    d_hist = driver_dnf_history.get(driver, [])
+                    c_hist = constructor_dnf_history.get(constructor, [])
+                    driver_dnf_rate = (
+                        sum(d_hist[-DNF_WINDOW:]) / len(d_hist[-DNF_WINDOW:])
+                        if d_hist
+                        else 0.0
+                    )
+                    constructor_dnf_rate = (
+                        sum(c_hist[-DNF_WINDOW:]) / len(c_hist[-DNF_WINDOW:])
+                        if c_hist
+                        else 0.0
+                    )
+
+                    dnf_flag = 1 if is_dnf(result.get("status")) else 0
+
                     writer.writerow([
                         season,
                         round_no,
@@ -347,6 +385,7 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                         driver,
                         grid_pos,
                         finish_pos,
+                        dnf_flag,
                         penalty_places,
                         penalty_flag,
                         bonus_flag,
@@ -366,6 +405,8 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                         cons_momentum,
                         circuit_podium_rate,
                         constructor_podium_rate,
+                        driver_dnf_rate,
+                        constructor_dnf_rate,
                         pit_stop_difficulty,
                         weather.get("temp_mean"),
                         weather.get("precip_sum"),
@@ -374,12 +415,19 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                     ])
 
                     # Update statistics after writing row
+                    driver_dnf_history.setdefault(driver, []).append(dnf_flag)
+                    constructor_dnf_history.setdefault(constructor, []).append(
+                        dnf_flag
+                    )
                     if finish_pos is not None:
                         circuit_counts[circuit_id] = circ_count + 1
                         constructor_counts[constructor] = cons_count + 1
                         if finish_pos <= 3:
                             circuit_podiums[circuit_id] = circ_pods + 1
                             constructor_podiums[constructor] = cons_pods + 1
+
+                if current_psd is not None:
+                    circuit_pit_history.setdefault(circuit_id, []).append(current_psd)
 
                 log(f"✅ stored {len(results)} results for {season} round {round_no}")
                 round_no += 1
