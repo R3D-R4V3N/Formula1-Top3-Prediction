@@ -5,9 +5,6 @@ import json
 import os
 from datetime import datetime
 
-from meteostat import Hourly, Point
-from pyowm.owm import OWM
-
 from fetch_data import fetch_round_data, log
 
 
@@ -80,76 +77,14 @@ def get_last_round(csv_file: str):
     return None
 
 
-def fetch_weather(season: int, round_no: int):
-    """Return weather features for a race using caching."""
-    os.makedirs("weather_cache", exist_ok=True)
+
+def load_weather(season: int, round_no: int):
+    """Load cached weather features for a race."""
     cache_file = os.path.join("weather_cache", f"weather_{season}_{round_no}.json")
     if os.path.exists(cache_file):
         with open(cache_file, encoding="utf-8") as f:
             return json.load(f)
-
-    try:
-        race = fetch_round_data(season, round_no)
-        if race is None:
-            return {}
-        info = race
-        loc = info.get("Circuit", {}).get("Location", {})
-        lat = float(loc.get("lat"))
-        lon = float(loc.get("long"))
-        date_str = info.get("date")
-        race_day = datetime.fromisoformat(date_str)
-
-        start = datetime(race_day.year, race_day.month, race_day.day, 12)
-        end = datetime(race_day.year, race_day.month, race_day.day, 14)
-
-        now = datetime.utcnow()
-        features = {
-            "temp_mean": None,
-            "precip_sum": None,
-            "humidity_mean": None,
-            "wind_mean": None,
-        }
-
-        if start <= now:
-            # historical data via Meteostat
-            location = Point(lat, lon)
-            data = Hourly(location, start, end)
-            df_w = data.fetch()
-            if not df_w.empty:
-                features = {
-                    "temp_mean": float(df_w["temp"].mean()),
-                    "precip_sum": float(df_w["prcp"].sum()),
-                    "humidity_mean": float(df_w["rhum"].mean()),
-                    "wind_mean": float(df_w["wspd"].mean()),
-                }
-        else:
-            api_key = os.getenv("OWM_API_KEY")
-            if api_key:
-                owm = OWM(api_key)
-                mgr = owm.weather_manager()
-                fc = mgr.forecast_hourly(lat=lat, lon=lon)
-                hours = [
-                    h
-                    for h in fc.forecast
-                    if start <= h.reference_time("date") <= end
-                ]
-                if hours:
-                    temps = [h.temperature("celsius").get("temp") for h in hours]
-                    prcps = [h.rain.get("1h", 0.0) for h in hours]
-                    hums = [h.humidity for h in hours]
-                    winds = [h.wind().get("speed", 0.0) for h in hours]
-                    features = {
-                        "temp_mean": sum(temps) / len(temps) if temps else None,
-                        "precip_sum": sum(prcps) if prcps else None,
-                        "humidity_mean": sum(hums) / len(hums) if hums else None,
-                        "wind_mean": sum(winds) / len(winds) if winds else None,
-                    }
-
-        with open(cache_file, "w", encoding="utf-8") as f:
-            json.dump(features, f)
-        return features
-    except Exception:
-        return {}
+    return {}
 
 
 def prepare_dataset(start_season: int, end_season: int, output_file: str):
@@ -265,7 +200,7 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                     avg_dur = sum(pit_durations) / len(pit_durations)
                     pit_stop_difficulty = len(pit_durations) * avg_dur
 
-                weather = fetch_weather(season, round_no)
+                weather = load_weather(season, round_no)
 
                 # Convert standings to dicts for quick lookup
                 ds_map = {d["Driver"]["driverId"]: d for d in driver_standings}

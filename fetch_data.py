@@ -6,9 +6,12 @@ import time
 from datetime import datetime
 
 import requests
+from meteostat import Hourly, Point
+from pyowm.owm import OWM
 
 BASE_URL = "https://api.jolpi.ca/ergast/f1"
 CACHE_DIR = "jolpica_f1_cache"
+WEATHER_DIR = "weather_cache"
 
 
 def log(message: str) -> None:
@@ -135,6 +138,78 @@ def get_pitstops(season: int, round_no: int):
     return []
 
 
+def fetch_weather(season: int, round_no: int):
+    """Fetch and cache weather data for the given race."""
+    os.makedirs(WEATHER_DIR, exist_ok=True)
+    cache_file = os.path.join(WEATHER_DIR, f"weather_{season}_{round_no}.json")
+    if os.path.exists(cache_file):
+        with open(cache_file, encoding="utf-8") as f:
+            return json.load(f)
+
+    race_info = get_round_info(season, round_no)
+    if not race_info:
+        return {}
+
+    loc = race_info.get("Circuit", {}).get("Location", {})
+    lat = float(loc.get("lat"))
+    lon = float(loc.get("long"))
+    date_str = race_info.get("date")
+    race_day = datetime.fromisoformat(date_str)
+
+    start = datetime(race_day.year, race_day.month, race_day.day, 12)
+    end = datetime(race_day.year, race_day.month, race_day.day, 14)
+
+    now = datetime.utcnow()
+    features = {
+        "temp_mean": None,
+        "precip_sum": None,
+        "humidity_mean": None,
+        "wind_mean": None,
+    }
+
+    try:
+        if start <= now:
+            # historical data via Meteostat
+            location = Point(lat, lon)
+            data = Hourly(location, start, end)
+            df_w = data.fetch()
+            if not df_w.empty:
+                features = {
+                    "temp_mean": float(df_w["temp"].mean()),
+                    "precip_sum": float(df_w["prcp"].sum()),
+                    "humidity_mean": float(df_w["rhum"].mean()),
+                    "wind_mean": float(df_w["wspd"].mean()),
+                }
+        else:
+            api_key = os.getenv("OWM_API_KEY")
+            if api_key:
+                owm = OWM(api_key)
+                mgr = owm.weather_manager()
+                fc = mgr.forecast_hourly(lat=lat, lon=lon)
+                hours = [
+                    h
+                    for h in fc.forecast
+                    if start <= h.reference_time("date") <= end
+                ]
+                if hours:
+                    temps = [h.temperature("celsius").get("temp") for h in hours]
+                    prcps = [h.rain.get("1h", 0.0) for h in hours]
+                    hums = [h.humidity for h in hours]
+                    winds = [h.wind().get("speed", 0.0) for h in hours]
+                    features = {
+                        "temp_mean": sum(temps) / len(temps) if temps else None,
+                        "precip_sum": sum(prcps) if prcps else None,
+                        "humidity_mean": sum(hums) / len(hums) if hums else None,
+                        "wind_mean": sum(winds) / len(winds) if winds else None,
+                    }
+    except Exception:
+        pass
+
+    with open(cache_file, "w", encoding="utf-8") as f:
+        json.dump(features, f)
+    return features
+
+
 def fetch_round_data(season: int, round_no: int):
     """Fetch and cache raw data for a given season and round."""
     os.makedirs(os.path.join(CACHE_DIR, str(season)), exist_ok=True)
@@ -183,6 +258,7 @@ def fetch_data(start_season: int, end_season: int):
             data = fetch_round_data(season, round_no)
             if data is None:
                 break
+            fetch_weather(season, round_no)
             log(f"✅ cached data for {season} round {round_no}")
             round_no += 1
 
