@@ -151,6 +151,7 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                 "constructor_podium_rate",
                 "driver_dnf_rate",
                 "constructor_dnf_rate",
+                "overtaking_difficulty",
                 "pit_stop_difficulty",
                 "temp_mean",
                 "precip_sum",
@@ -169,6 +170,7 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
         driver_dnf_history = {}
         constructor_dnf_history = {}
         circuit_pit_history = {}
+        circuit_overtake_history = {}
 
         for season in range(start_s, end_season + 1):
             round_no = start_r if season == start_s else 1
@@ -240,6 +242,11 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                     sum(past_diffs) / len(past_diffs) if past_diffs else None
                 )
 
+                past_ot_diffs = circuit_overtake_history.get(circuit_id, [])
+                overtaking_difficulty = (
+                    sum(past_ot_diffs) / len(past_ot_diffs) if past_ot_diffs else None
+                )
+
                 weather = load_weather(season, round_no)
 
                 # Convert standings to dicts for quick lookup
@@ -281,6 +288,11 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                     qual_pos = qual_positions.get(driver)
                     grid_pos = qual_pos
                     finish_pos = try_int(result.get("position"))
+
+                    if grid_pos is not None and finish_pos is not None:
+                        ov_diff = abs(grid_pos - finish_pos)
+                    else:
+                        ov_diff = None
 
                     # Penalty-related features default to zero since the final
                     # grid is unknown prior to the race.
@@ -415,6 +427,7 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                         constructor_podium_rate,
                         driver_dnf_rate,
                         constructor_dnf_rate,
+                        overtaking_difficulty,
                         pit_stop_difficulty,
                         weather.get("temp_mean"),
                         weather.get("precip_sum"),
@@ -427,6 +440,8 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                     constructor_dnf_history.setdefault(constructor, []).append(
                         dnf_flag
                     )
+                    if ov_diff is not None:
+                        circuit_overtake_history.setdefault(circuit_id, []).append(ov_diff)
                     if finish_pos is not None:
                         circuit_counts[circuit_id] = circ_count + 1
                         constructor_counts[constructor] = cons_count + 1

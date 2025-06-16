@@ -130,6 +130,11 @@ def build_features(season: int, round_no: int, hist_df: pd.DataFrame) -> pd.Data
         hist_df["circuit_id"] == circuit_id, "pit_stop_difficulty"
     ]
     mean_psd = past_psd.mean()
+
+    past_ot = hist_df.loc[
+        hist_df["circuit_id"] == circuit_id, "overtaking_difficulty"
+    ]
+    mean_od = past_ot.mean()
     weather = fetch_weather(season, round_no)
 
     rows = []
@@ -249,6 +254,7 @@ def build_features(season: int, round_no: int, hist_df: pd.DataFrame) -> pd.Data
                 constructor_podium_rate=constructor_podium_rate,
                 driver_dnf_rate=driver_dnf_rate,
                 constructor_dnf_rate=constructor_dnf_rate,
+                overtaking_difficulty=mean_od,
                 pit_stop_difficulty=mean_psd,
                 temp_mean=weather.get("temp_mean"),
                 precip_sum=weather.get("precip_sum"),
