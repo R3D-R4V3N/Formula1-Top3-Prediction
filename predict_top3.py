@@ -99,16 +99,21 @@ def build_features(season: int, round_no: int, hist_df: pd.DataFrame) -> pd.Data
         .to_dict()
     )
 
-    driver_dnf_hist = (
-        hist_df.groupby("driver_id")["dnf_flag"]
-        .apply(lambda s: s.sort_index().tolist())
-        .to_dict()
-    )
-    cons_dnf_hist = (
-        hist_df.groupby("constructor_id")["dnf_flag"]
-        .apply(lambda s: s.sort_index().tolist())
-        .to_dict()
-    )
+    if "dnf_flag" in hist_df.columns:
+        driver_dnf_hist = (
+            hist_df.groupby("driver_id")["dnf_flag"]
+            .apply(lambda s: s.sort_index().tolist())
+            .to_dict()
+        )
+        cons_dnf_hist = (
+            hist_df.groupby("constructor_id")["dnf_flag"]
+            .apply(lambda s: s.sort_index().tolist())
+            .to_dict()
+        )
+    else:
+        # If DNF information is unavailable, fall back to empty histories
+        driver_dnf_hist = {d: [] for d in hist_df["driver_id"].unique()}
+        cons_dnf_hist = {c: [] for c in hist_df["constructor_id"].unique()}
 
     circuit_stats = (
         hist_df.groupby("circuit_id")["top3_flag"]
@@ -271,7 +276,11 @@ def main() -> None:
         | ((df["season_year"] == args.season) & (df["round_number"] < args.round))
     ]
 
-    X = train_df.drop(columns=["finishing_position", "top3_flag", "group", "dnf_flag"])
+    drop_cols = ["finishing_position", "top3_flag", "group"]
+    if "dnf_flag" in train_df.columns:
+        drop_cols.append("dnf_flag")
+
+    X = train_df.drop(columns=drop_cols)
     y = train_df["top3_flag"].values
     cat_cols = ["circuit_id", "driver_id", "constructor_id"]
     cat_idx = [X.columns.get_loc(c) for c in cat_cols]
