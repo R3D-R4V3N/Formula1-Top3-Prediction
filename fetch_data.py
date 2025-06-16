@@ -3,7 +3,7 @@
 import json
 import os
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import requests
 from meteostat import Hourly, Point
@@ -182,16 +182,24 @@ def fetch_weather(season: int, round_no: int):
 
     try:
         if start <= now:
-            # historical data via Meteostat
+            # historical average of the forecast window from the last ten years
             location = Point(lat, lon)
-            data = Hourly(location, start, end)
-            df_w = data.fetch()
-            if not df_w.empty:
+            temps, prcps, hums, winds = [], [], [], []
+            for yr in range(start.year - 10, start.year):
+                q_start = start.replace(year=yr) - timedelta(days=1)
+                q_end = end.replace(year=yr) - timedelta(days=1)
+                df_w = Hourly(location, q_start, q_end).fetch()
+                if not df_w.empty:
+                    temps.append(df_w["temp"].mean())
+                    prcps.append(df_w["prcp"].sum())
+                    hums.append(df_w["rhum"].mean())
+                    winds.append(df_w["wspd"].mean())
+            if temps:
                 features = {
-                    "temp_mean": float(df_w["temp"].mean()),
-                    "precip_sum": float(df_w["prcp"].sum()),
-                    "humidity_mean": float(df_w["rhum"].mean()),
-                    "wind_mean": float(df_w["wspd"].mean()),
+                    "temp_mean": float(sum(temps) / len(temps)),
+                    "precip_sum": float(sum(prcps) / len(prcps)),
+                    "humidity_mean": float(sum(hums) / len(hums)),
+                    "wind_mean": float(sum(winds) / len(winds)),
                 }
         else:
             api_key = os.getenv("OWM_API_KEY")
@@ -211,7 +219,7 @@ def fetch_weather(season: int, round_no: int):
                     winds = [h.wind().get("speed", 0.0) for h in hours]
                     features = {
                         "temp_mean": sum(temps) / len(temps) if temps else None,
-                        "precip_sum": sum(prcps) if prcps else None,
+                        "precip_sum": sum(prcps) / len(prcps) if prcps else None,
                         "humidity_mean": sum(hums) / len(hums) if hums else None,
                         "wind_mean": sum(winds) / len(winds) if winds else None,
                     }
