@@ -269,15 +269,18 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                     cons_count = constructor_counts.get(constructor, 0)
                     cons_pods = constructor_podiums.get(constructor, 0)
 
-                    grid_pos = try_int(result.get("grid"))
-                    finish_pos = try_int(result.get("position"))
+                    # Starting grid information should only rely on qualifying
+                    # results. Using race result grid positions would leak grid
+                    # penalties applied after qualifying.
                     qual_pos = qual_positions.get(driver)
-                    if grid_pos is not None and qual_pos is not None:
-                        penalty_places = grid_pos - qual_pos
-                    else:
-                        penalty_places = None
-                    penalty_flag = 1 if penalty_places is not None and penalty_places > 0 else 0
-                    bonus_flag = 1 if penalty_places is not None and penalty_places < 0 else 0
+                    grid_pos = qual_pos
+                    finish_pos = try_int(result.get("position"))
+
+                    # Penalty-related features default to zero since the final
+                    # grid is unknown prior to the race.
+                    penalty_places = 0
+                    penalty_flag = 0
+                    bonus_flag = 0
 
                     teammates = [t for t in team_map.get(constructor, []) if t != driver]
                     teammate_best = None
