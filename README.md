@@ -26,7 +26,7 @@ This repository contains utilities to download Formula 1 race data using the Jol
 - driver DNF rate (rolling window)
 - constructor DNF rate (rolling window)
 - pit stop difficulty index
-- overtaking difficulty index
+- overtaking difficulty index (1 = impossible to overtake, 0 = easy)
 - mean temperature forecast for the race window
 - total precipitation forecast for the race window
 - mean humidity forecast for the race window

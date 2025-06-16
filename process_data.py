@@ -243,8 +243,13 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                 )
 
                 past_ot_diffs = circuit_overtake_history.get(circuit_id, [])
+                avg_ov_diff = (
+                    sum(past_ot_diffs) / len(past_ot_diffs)
+                    if past_ot_diffs
+                    else None
+                )
                 overtaking_difficulty = (
-                    sum(past_ot_diffs) / len(past_ot_diffs) if past_ot_diffs else None
+                    1 / (1 + avg_ov_diff) if avg_ov_diff is not None else None
                 )
 
                 weather = load_weather(season, round_no)
