@@ -8,7 +8,7 @@ Run:
 import argparse, optuna, numpy as np, pandas as pd
 from pathlib import Path
 from catboost import CatBoostClassifier, Pool
-from sklearn.model_selection import GroupKFold
+from sklearn.model_selection import TimeSeriesSplit
 from sklearn.metrics import f1_score
 
 parser = argparse.ArgumentParser()
@@ -25,9 +25,8 @@ if 'dnf_flag' in df.columns:
     drop_cols.append('dnf_flag')
 X = df.drop(columns=drop_cols)
 y = df.top3_flag.values
-groups = df.group.values
 cat_idx = [X.columns.get_loc(c) for c in ['circuit_id', 'driver_id', 'constructor_id']]
-gkf = GroupKFold(5)
+tscv = TimeSeriesSplit(n_splits=5)
 
 def objective(trial):
     params = {
@@ -49,7 +48,7 @@ def objective(trial):
 
     thr = trial.suggest_float('thr', 0.40, 0.55)
     f1s = []
-    for tr, te in gkf.split(X, y, groups):
+    for tr, te in tscv.split(X):
         model = CatBoostClassifier(**params)
         model.fit(Pool(X.iloc[tr], y[tr], cat_features=cat_idx),
                   eval_set=Pool(X.iloc[te], y[te], cat_features=cat_idx),

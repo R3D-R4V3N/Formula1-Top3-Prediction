@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 from catboost import CatBoostClassifier, Pool
-from sklearn.model_selection import GroupKFold
+from sklearn.model_selection import TimeSeriesSplit
 from sklearn.metrics import precision_recall_fscore_support, roc_auc_score
 
 # ---------- CLI args ----------
@@ -42,14 +42,13 @@ if 'group' not in df.columns:
 
 X = df.drop(columns=['finishing_position','top3_flag','group'])
 y = df['top3_flag'].values
-groups = df['group'].values
 cat_idx = [X.columns.get_loc(c) for c in ['circuit_id','driver_id','constructor_id']]
 
 # ---------- collect OOF probabilities ----------
 y_probs = np.zeros_like(y, dtype=float)
 
-gkf = GroupKFold(n_splits=5)
-for train_idx, test_idx in gkf.split(X, y, groups):
+tscv = TimeSeriesSplit(n_splits=5)
+for train_idx, test_idx in tscv.split(X):
     train_pool = Pool(X.iloc[train_idx], y[train_idx], cat_features=cat_idx)
     valid_pool = Pool(X.iloc[test_idx],  y[test_idx],  cat_features=cat_idx)
     model = CatBoostClassifier(**MODEL_PARAMS)
