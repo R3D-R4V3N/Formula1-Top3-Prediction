@@ -255,6 +255,8 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                     for c in cons_standings_curr
                 }
 
+                rows_buffer = []
+                stat_buffer = []
                 for result in results:
                     driver = result["Driver"]["driverId"]
                     constructor = result["Constructor"]["constructorId"]
@@ -387,7 +389,7 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
 
                     dnf_flag = 1 if is_dnf(result.get("status")) else 0
 
-                    writer.writerow([
+                    rows_buffer.append([
                         season,
                         round_no,
                         circuit_id,
@@ -422,17 +424,20 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                         weather.get("wind_mean"),
                     ])
 
-                    # Update statistics after writing row
-                    driver_dnf_history.setdefault(driver, []).append(dnf_flag)
-                    constructor_dnf_history.setdefault(constructor, []).append(
-                        dnf_flag
-                    )
-                    if finish_pos is not None:
-                        circuit_counts[circuit_id] = circ_count + 1
-                        constructor_counts[constructor] = cons_count + 1
-                        if finish_pos <= 3:
-                            circuit_podiums[circuit_id] = circ_pods + 1
-                            constructor_podiums[constructor] = cons_pods + 1
+                    stat_buffer.append((driver, constructor, finish_pos, dnf_flag))
+
+                for row in rows_buffer:
+                    writer.writerow(row)
+
+                for d_id, c_id, pos, dnf_flag in stat_buffer:
+                    driver_dnf_history.setdefault(d_id, []).append(dnf_flag)
+                    constructor_dnf_history.setdefault(c_id, []).append(dnf_flag)
+                    if pos is not None:
+                        circuit_counts[circuit_id] = circuit_counts.get(circuit_id, 0) + 1
+                        constructor_counts[c_id] = constructor_counts.get(c_id, 0) + 1
+                        if pos <= 3:
+                            circuit_podiums[circuit_id] = circuit_podiums.get(circuit_id, 0) + 1
+                            constructor_podiums[c_id] = constructor_podiums.get(c_id, 0) + 1
 
                 if current_psd is not None:
                     circuit_pit_history.setdefault(circuit_id, []).append(current_psd)
