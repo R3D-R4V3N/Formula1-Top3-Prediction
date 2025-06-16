@@ -2,8 +2,10 @@
 
 import json
 import os
+import csv
 import time
 from datetime import datetime, timedelta
+from typing import List, Dict
 
 import requests
 from meteostat import Hourly, Point
@@ -231,6 +233,74 @@ def fetch_weather(season: int, round_no: int):
     return features
 
 
+def _fetch_all_laps(season: int, round_no: int) -> List[Dict]:
+    """Return the full lap list for a race."""
+    laps: List[Dict] = []
+    offset = 0
+    limit = 1000
+    while True:
+        url = f"{BASE_URL}/{season}/{round_no}/laps.json?limit={limit}&offset={offset}"
+        data = fetch_json(url)
+        races = data.get("RaceTable", {}).get("Races", [])
+        if races:
+            laps.extend(races[0].get("Laps", []))
+        total = int(data.get("total", 0))
+        offset += limit
+        if offset >= total:
+            break
+    return laps
+
+
+def get_ontrack_passes(season: int, round_no: int, csv_file: str = "overtakes.csv") -> None:
+    """Compute net on-track overtakes and append to overtakes.csv."""
+    race = fetch_round_data(season, round_no)
+    if race is None:
+        return
+
+    circuit = race.get("circuit_id")
+    pit_laps = {
+        int(p.get("lap"))
+        for p in race.get("pitstops", [])
+        if p.get("lap") is not None
+    }
+    laps = _fetch_all_laps(season, round_no)
+    positions: Dict[str, int] = {}
+    passes = 0
+    for lap in laps:
+        lap_no = int(lap.get("number", 0))
+        timings = lap.get("Timings", [])
+        if lap_no in pit_laps:
+            for t in timings:
+                try:
+                    positions[t["driverId"]] = int(t["position"])
+                except (KeyError, ValueError, TypeError):
+                    continue
+            continue
+        for t in timings:
+            try:
+                drv = t["driverId"]
+                pos = int(t["position"])
+            except (KeyError, ValueError, TypeError):
+                continue
+            prev_pos = positions.get(drv)
+            if prev_pos is not None and pos < prev_pos:
+                passes += 1
+            positions[drv] = pos
+
+    laps_completed = (
+        max(int(r.get("laps", 0)) for r in race.get("results", []))
+        if race.get("results")
+        else len(laps)
+    )
+
+    header_needed = not os.path.exists(csv_file)
+    with open(csv_file, "a", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        if header_needed:
+            writer.writerow(["season", "round", "circuit", "passes", "laps"])
+        writer.writerow([season, round_no, circuit, passes, laps_completed])
+
+
 def fetch_round_data(season: int, round_no: int):
     """Fetch and cache raw data for a given season and round."""
     os.makedirs(os.path.join(CACHE_DIR, str(season)), exist_ok=True)
@@ -280,6 +350,7 @@ def fetch_data(start_season: int, end_season: int):
             if data is None:
                 break
             fetch_weather(season, round_no)
+            get_ontrack_passes(season, round_no)
             log(f"✅ cached data for {season} round {round_no}")
             round_no += 1
 
