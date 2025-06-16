@@ -4,6 +4,8 @@ import csv
 import json
 import os
 from datetime import datetime
+from statistics import median
+from typing import Dict, List
 
 from fetch_data import fetch_round_data, log
 
@@ -104,6 +106,37 @@ def load_weather(season: int, round_no: int):
         return {}
 
 
+def load_overtakes(csv_file: str = "overtakes.csv") -> List[Dict]:
+    """Load overtakes data from CSV if available."""
+    if not os.path.exists(csv_file):
+        return []
+    with open(csv_file, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
+
+
+def build_odi_lookup(overtakes: List[Dict], season: int, window: int = 5) -> Dict[str, float]:
+    """Return ODI lookup for a season using prior seasons only."""
+    subset: Dict[str, List[float]] = {}
+    for row in overtakes:
+        try:
+            yr = int(row["season"])
+            if season - window <= yr < season:
+                circuit = row["circuit"]
+                passes = int(row["passes"])
+                laps = int(row["laps"])
+                if laps > 0:
+                    subset.setdefault(circuit, []).append(passes / laps)
+        except (KeyError, ValueError):
+            continue
+    if not subset:
+        return {}
+    medians = {c: median(v) for c, v in subset.items()}
+    max_opl = max(medians.values())
+    if max_opl == 0:
+        return {c: 0.0 for c in medians}
+    return {c: 1.0 - (m / max_opl) for c, m in medians.items()}
+
+
 def prepare_dataset(start_season: int, end_season: int, output_file: str):
     """Prepare CSV data for the given seasons using cached raw data."""
 
@@ -119,6 +152,8 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
     circuit_podiums = {}
     constructor_counts = {}
     constructor_podiums = {}
+
+    overtakes = load_overtakes()
 
     with open(output_file, mode, newline="", encoding="utf-8") as csvfile:
         writer = csv.writer(csvfile)
@@ -152,6 +187,8 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                 "driver_dnf_rate",
                 "constructor_dnf_rate",
                 "pit_stop_difficulty",
+                "odi_raw",
+                "grid_odi_interact",
                 "temp_mean",
                 "precip_sum",
                 "humidity_mean",
@@ -171,6 +208,7 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
         circuit_pit_history = {}
 
         for season in range(start_s, end_season + 1):
+            odi_lookup = build_odi_lookup(overtakes, season)
             round_no = start_r if season == start_s else 1
             while True:
                 log(f"🚦 {season} round {round_no}")
@@ -241,6 +279,7 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                 )
 
                 weather = load_weather(season, round_no)
+                odi_val = odi_lookup.get(circuit_id)
 
                 # Convert standings to dicts for quick lookup
                 ds_prev_map = {d["Driver"]["driverId"]: d for d in driver_standings_prev}
@@ -281,6 +320,10 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                     qual_pos = qual_positions.get(driver)
                     grid_pos = qual_pos
                     finish_pos = try_int(result.get("position"))
+
+                    grid_odi_interact = (
+                        grid_pos * odi_val if grid_pos is not None and odi_val is not None else None
+                    )
 
                     # Penalty-related features default to zero since the final
                     # grid is unknown prior to the race.
@@ -416,6 +459,8 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                         driver_dnf_rate,
                         constructor_dnf_rate,
                         pit_stop_difficulty,
+                        odi_val,
+                        grid_odi_interact,
                         weather.get("temp_mean"),
                         weather.get("precip_sum"),
                         weather.get("humidity_mean"),
