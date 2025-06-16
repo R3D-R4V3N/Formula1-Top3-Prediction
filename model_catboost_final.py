@@ -18,10 +18,11 @@ Dependencies:
     pip install catboost scikit‑learn pandas numpy
 
 
-    Best trial: 121. Best value: 0.828142: 100%|████████████████████████████████████████████████████████████████████████████████████████| 400/400 [1:20:38<00:00, 12.10s/it]
-Best F1: 0.8281424619500234
+_temp': 0.4554886554201325, 'thr': 0.5062213816043502}. Best is trial 219 with value: 0.899145993242584.
+Best trial: 219. Best value: 0.899146: 100%|████████████████████████████████████████████████████████████████████████████████████████| 400/400 [2:22:43<00:00, 21.41s/it]
+Best F1: 0.899145993242584
 Best parameters:
-{'iterations': 2871, 'lr': 0.04562949382822975, 'depth': 6, 'l2': 8, 'bag_temp': 0.995529172657803, 'thr': 0.6048543765126713}
+{'iterations': 4712, 'lr': 0.04725566038791607, 'depth': 6, 'l2': 10, 'bag_temp': 0.3023551355383588, 'thr': 0.5065188459599775}
 jasper@jasper-XPS-15-9530:~/Documents/Github/Formula1-Top3-Prediction$ 
 """
 
@@ -37,14 +38,14 @@ from sklearn.metrics import (
 )
 
 # -------------------- Config --------------------
-THRESHOLD = 0.6048543765126713  # tuned decision cutoff
+THRESHOLD = 0.5065188459599775  # tuned decision cutoff
 
 MODEL_PARAMS = dict(
-    iterations=2871,
-    learning_rate=0.04562949382822975,
+    iterations=4712,
+    learning_rate=0.04725566038791607,
     depth=6,
-    l2_leaf_reg=8,
-    bagging_temperature=0.995529172657803,
+    l2_leaf_reg=10,
+    bagging_temperature=0.3023551355383588,
     loss_function="Logloss",
     eval_metric="AUC",
     random_seed=42,
@@ -58,7 +59,11 @@ df = pd.read_csv(csv_path)
 df["top3_flag"] = (df["finishing_position"] <= 3).astype(int)
 df["group"] = df["season_year"].astype(str) + "-" + df["round_number"].astype(str)
 
-X = df.drop(columns=["finishing_position", "top3_flag", "group"])
+drop_cols = ["finishing_position", "top3_flag", "group"]
+if "dnf_flag" in df.columns:
+    drop_cols.append("dnf_flag")
+
+X = df.drop(columns=drop_cols)
 y = df["top3_flag"].values
 groups = df["group"].values
 

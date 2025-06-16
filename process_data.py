@@ -7,6 +7,17 @@ from datetime import datetime
 
 from fetch_data import fetch_round_data, log
 
+# window size for computing DNF rates
+DNF_WINDOW = 5
+
+
+def is_dnf(status: str) -> bool:
+    """Return True if the given status indicates a retirement."""
+    if not status:
+        return True
+    status = status.lower()
+    return not ("finished" in status or "lap" in status)
+
 
 def parse_qual_time(time_str: str):
     """Convert a qualifying lap time 'm:ss.sss' or 'ss.sss' to seconds."""
@@ -130,6 +141,10 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                 "driver_momentum",
                 "constructor_last3_performance",
                 "constructor_momentum",
+                "circuit_podium_rate",
+                "constructor_podium_rate",
+                "driver_dnf_rate",
+                "constructor_dnf_rate",
                 "pit_stop_difficulty",
                 "temp_mean",
                 "precip_sum",
@@ -145,6 +160,9 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
 
         points_history = {}
         constructor_points_history = {}
+        driver_dnf_history = {}
+        constructor_dnf_history = {}
+        circuit_pit_history = {}
 
         for season in range(start_s, end_season + 1):
             round_no = start_r if season == start_s else 1
@@ -155,9 +173,17 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                     break
                 circuit_id = data["circuit_id"]
                 results = data["results"]
-                driver_standings = data["driver_standings"]
-                cons_standings = data["constructor_standings"]
+                driver_standings_curr = data["driver_standings"]
+                cons_standings_curr = data["constructor_standings"]
                 qual_results = data["qualifying"]
+
+                if round_no == 1:
+                    driver_standings_prev = []
+                    cons_standings_prev = []
+                else:
+                    prev = fetch_round_data(season, round_no - 1)
+                    driver_standings_prev = prev.get("driver_standings", [])
+                    cons_standings_prev = prev.get("constructor_standings", [])
 
                 # Map best qualifying times in seconds
                 best_times = {}
@@ -197,29 +223,45 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                     dur = parse_pit_duration(p.get("duration"))
                     if dur is not None:
                         pit_durations.append(dur)
-                pit_stop_difficulty = None
+
+                current_psd = None
                 if pit_durations:
                     avg_dur = sum(pit_durations) / len(pit_durations)
-                    pit_stop_difficulty = len(pit_durations) * avg_dur
+                    current_psd = len(pit_durations) * avg_dur
+
+                past_diffs = circuit_pit_history.get(circuit_id, [])
+                pit_stop_difficulty = (
+                    sum(past_diffs) / len(past_diffs) if past_diffs else None
+                )
 
                 weather = load_weather(season, round_no)
 
                 # Convert standings to dicts for quick lookup
-                ds_map = {d["Driver"]["driverId"]: d for d in driver_standings}
-                cs_map = {c["Constructor"]["constructorId"]: c for c in cons_standings}
+                ds_prev_map = {d["Driver"]["driverId"]: d for d in driver_standings_prev}
+                cs_prev_map = {
+                    c["Constructor"]["constructorId"]: c
+                    for c in cons_standings_prev
+                }
+
+                ds_curr_map = {d["Driver"]["driverId"]: d for d in driver_standings_curr}
+                cs_curr_map = {
+                    c["Constructor"]["constructorId"]: c
+                    for c in cons_standings_curr
+                }
 
                 for result in results:
                     driver = result["Driver"]["driverId"]
                     constructor = result["Constructor"]["constructorId"]
-                    ds = ds_map.get(driver, {})
-                    cs = cs_map.get(constructor, {})
+                    ds = ds_prev_map.get(driver, {})
+                    cs = cs_prev_map.get(constructor, {})
 
                     # Championship rank with fallback to last known value
                     rank = try_int(ds.get("position"))
                     if rank is None:
                         rank = last_driver_rank.get(driver)
-                    else:
-                        last_driver_rank[driver] = rank
+                    post_rank = try_int(ds_curr_map.get(driver, {}).get("position"))
+                    if post_rank is not None:
+                        last_driver_rank[driver] = post_rank
 
                     # Historical counts for target/mean encoding
                     circ_count = circuit_counts.get(circuit_id, 0)
@@ -251,7 +293,7 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                     if teammate_gap is None:
                         teammate_gap = 5.0
 
-                    points_total = try_float(ds.get("points"))
+                    points_total_prev = try_float(ds.get("points"))
                     history = points_history.setdefault(driver, [])
 
                     # average points scored in the previous 3 races (leakage-safe)
@@ -262,18 +304,23 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                     else:
                         last3_perf = 0.0
 
-                    history.append(points_total if points_total is not None else 0.0)
+                    points_after = try_float(ds_curr_map.get(driver, {}).get("points"))
 
                     momentum = None
-                    if len(history) >= 7:
+                    if len(history) >= 6:
                         last3 = history[-1] - history[-4]
-                        prev3 = history[-4] - history[-7]
+                        prev3 = history[-4] - history[-6]
                         momentum = last3 - prev3
                     else:
                         momentum = 0.0
 
+                    history.append(
+                        points_after if points_after is not None else (history[-1] if history else 0.0)
+                    )
+
                     cons_points = try_float(cs.get("points"))
                     cons_hist = constructor_points_history.setdefault(constructor, [])
+                    cons_points_after = try_float(cs_curr_map.get(constructor, {}).get("points"))
 
                     if len(cons_hist) >= 4:
                         cons_last3_perf = (cons_hist[-1] - cons_hist[-4]) / 3
@@ -282,15 +329,19 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                     else:
                         cons_last3_perf = 0.0
 
-                    cons_hist.append(cons_points if cons_points is not None else 0.0)
-
                     cons_momentum = None
-                    if len(cons_hist) >= 7:
+                    if len(cons_hist) >= 6:
                         last3_c = cons_hist[-1] - cons_hist[-4]
-                        prev3_c = cons_hist[-4] - cons_hist[-7]
+                        prev3_c = cons_hist[-4] - cons_hist[-6]
                         cons_momentum = last3_c - prev3_c
                     else:
                         cons_momentum = 0.0
+
+                    cons_hist.append(
+                        cons_points_after
+                        if cons_points_after is not None
+                        else (cons_hist[-1] if cons_hist else 0.0)
+                    )
 
                     gap_sec = (
                         best_times.get(driver) - pole_time
@@ -304,6 +355,28 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                     )
                     gap_sec = gap_sec if gap_sec is not None else 5.0
                     gap_pct = gap_pct if gap_pct is not None else 5.0
+
+                    circuit_podium_rate = (
+                        circ_pods / circ_count if circ_count else 0.0
+                    )
+                    constructor_podium_rate = (
+                        cons_pods / cons_count if cons_count else 0.0
+                    )
+
+                    d_hist = driver_dnf_history.get(driver, [])
+                    c_hist = constructor_dnf_history.get(constructor, [])
+                    driver_dnf_rate = (
+                        sum(d_hist[-DNF_WINDOW:]) / len(d_hist[-DNF_WINDOW:])
+                        if d_hist
+                        else 0.0
+                    )
+                    constructor_dnf_rate = (
+                        sum(c_hist[-DNF_WINDOW:]) / len(c_hist[-DNF_WINDOW:])
+                        if c_hist
+                        else 0.0
+                    )
+
+                    dnf_flag = 1 if is_dnf(result.get("status")) else 0
 
                     writer.writerow([
                         season,
@@ -329,6 +402,10 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                         momentum,
                         cons_last3_perf,
                         cons_momentum,
+                        circuit_podium_rate,
+                        constructor_podium_rate,
+                        driver_dnf_rate,
+                        constructor_dnf_rate,
                         pit_stop_difficulty,
                         weather.get("temp_mean"),
                         weather.get("precip_sum"),
@@ -337,12 +414,19 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                     ])
 
                     # Update statistics after writing row
+                    driver_dnf_history.setdefault(driver, []).append(dnf_flag)
+                    constructor_dnf_history.setdefault(constructor, []).append(
+                        dnf_flag
+                    )
                     if finish_pos is not None:
                         circuit_counts[circuit_id] = circ_count + 1
                         constructor_counts[constructor] = cons_count + 1
                         if finish_pos <= 3:
                             circuit_podiums[circuit_id] = circ_pods + 1
                             constructor_podiums[constructor] = cons_pods + 1
+
+                if current_psd is not None:
+                    circuit_pit_history.setdefault(circuit_id, []).append(current_psd)
 
                 log(f"✅ stored {len(results)} results for {season} round {round_no}")
                 round_no += 1
