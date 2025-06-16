@@ -10,11 +10,10 @@ Dependencies:
     pip install catboost scikit‑learn pandas numpy
 
 
-_temp': 0.4554886554201325, 'thr': 0.5062213816043502}. Best is trial 219 with value: 0.899145993242584.
-Best trial: 219. Best value: 0.899146: 100%|████████████████████████████████████████████████████████████████████████████████████████| 400/400 [2:22:43<00:00, 21.41s/it]
-Best F1: 0.899145993242584
+Best trial: 202. Best value: 0.90603: 100%|█████████████████████████████████████████████████████████████████████████████████████████| 400/400 [2:34:17<00:00, 23.14s/it]
+Best F1: 0.9060295851914649
 Best parameters:
-{'iterations': 4712, 'lr': 0.04725566038791607, 'depth': 6, 'l2': 10, 'bag_temp': 0.3023551355383588, 'thr': 0.5065188459599775}
+{'iterations': 1528, 'lr': 0.016285023353888272, 'depth': 6, 'l2': 9, 'bag_temp': 0.5922072238932671, 'thr': 0.6499789940017192}
 jasper@jasper-XPS-15-9530:~/Documents/Github/Formula1-Top3-Prediction$ 
 """
 
@@ -30,14 +29,14 @@ from sklearn.metrics import (
 )
 
 # -------------------- Config --------------------
-THRESHOLD = 0.5065188459599775  # tuned decision cutoff
+THRESHOLD = 0.6499789940017192  # tuned decision cutoff
 
 MODEL_PARAMS = dict(
-    iterations=4712,
-    learning_rate=0.04725566038791607,
+    iterations=1528,
+    learning_rate=0.016285023353888272,
     depth=6,
-    l2_leaf_reg=10,
-    bagging_temperature=0.3023551355383588,
+    l2_leaf_reg=9,
+    bagging_temperature=0.5922072238932671,
     loss_function="Logloss",
     eval_metric="AUC",
     random_seed=42,
