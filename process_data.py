@@ -90,12 +90,18 @@ def get_last_round(csv_file: str):
 
 
 def load_weather(season: int, round_no: int):
-    """Load cached weather features for a race."""
+    """Load cached weather forecast features for a race."""
     cache_file = os.path.join("weather_cache", f"weather_{season}_{round_no}.json")
     if os.path.exists(cache_file):
         with open(cache_file, encoding="utf-8") as f:
             return json.load(f)
-    return {}
+    # If the file is missing, attempt to fetch and cache it
+    try:
+        from fetch_data import fetch_weather
+
+        return fetch_weather(season, round_no)
+    except Exception:
+        return {}
 
 
 def prepare_dataset(start_season: int, end_season: int, output_file: str):
