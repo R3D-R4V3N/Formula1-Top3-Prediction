@@ -1,7 +1,7 @@
 """
 Final CatBoost model for predicting top‑3 podium finishes in Formula 1.
 
-Performance target: F1 ≥ 0.80 and recall ≥ 0.90 (5‑fold GroupKFold)
+Performance target: F1 ≥ 0.80 and recall ≥ 0.90 (5‑fold TimeSeriesSplit)
 
 Usage:
     python model_catboost_final.py
@@ -21,7 +21,7 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 from catboost import CatBoostClassifier, Pool
-from sklearn.model_selection import GroupKFold
+from sklearn.model_selection import TimeSeriesSplit
 from sklearn.metrics import (
     accuracy_score,
     precision_recall_fscore_support,
@@ -56,7 +56,6 @@ if "dnf_flag" in df.columns:
 
 X = df.drop(columns=drop_cols)
 y = df["top3_flag"].values
-groups = df["group"].values
 
 cat_cols = ["circuit_id", "driver_id", "constructor_id"]
 cat_idx = [X.columns.get_loc(c) for c in cat_cols]
@@ -64,10 +63,10 @@ cat_idx = [X.columns.get_loc(c) for c in cat_cols]
 MODEL_PARAMS["class_weights"] = [1.0, (y == 0).sum() / (y == 1).sum()]
 
 # -------------------- Cross‑validation --------------------
-gkf = GroupKFold(n_splits=5)
+tscv = TimeSeriesSplit(n_splits=5)
 metrics = {k: [] for k in ["acc", "prec", "rec", "f1", "auc"]}
 
-for fold, (train_idx, test_idx) in enumerate(gkf.split(X, y, groups), 1):
+for fold, (train_idx, test_idx) in enumerate(tscv.split(X), 1):
     model = CatBoostClassifier(**MODEL_PARAMS)
 
     train_pool = Pool(X.iloc[train_idx], y[train_idx], cat_features=cat_idx)
