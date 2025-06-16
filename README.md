@@ -90,3 +90,15 @@ python predict_top3.py --season 2025 --round 9
 ```
 
 The command above predicts the Spanish Grand Prix (round 9) for the 2025 season.
+
+### Streamlit Web App
+
+You can also explore predictions interactively with Streamlit:
+
+```bash
+streamlit run streamlit_app.py
+```
+
+The app lets you choose a season and round, shows the predicted probabilities
+for each driver, and visualizes global and per-driver feature importance using
+SHAP values.
