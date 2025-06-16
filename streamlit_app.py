@@ -68,6 +68,10 @@ def main() -> None:
 
         explainer = shap.TreeExplainer(model)
         shap_values = explainer.shap_values(Pool(features, cat_features=cat_idx))
+        if isinstance(shap_values, list):
+            shap_values = shap_values[1]
+        if shap_values.shape[1] == len(feature_order) + 1:
+            shap_values = shap_values[:, :-1]
 
         st.subheader("Global feature importance")
         shap.summary_plot(shap_values, features[feature_order], show=False)
