@@ -1,14 +1,6 @@
 """
 Final CatBoost model for predicting top‑3 podium finishes in Formula 1.
 
-Hyper‑parameters tuned via Optuna (latest weather‑features run):
-    iterations          = 2223
-    learning_rate       = 0.015024003619164828
-    depth               = 6
-    l2_leaf_reg         = 4
-    bagging_temperature = 0.20074625051179276
-    decision_threshold  = 0.5887412074833219
-
 Performance target: F1 ≥ 0.80 and recall ≥ 0.90 (5‑fold GroupKFold)
 
 Usage:
