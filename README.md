@@ -26,10 +26,14 @@ This repository contains utilities to download Formula 1 race data using the Jol
 - driver DNF rate (rolling window)
 - constructor DNF rate (rolling window)
 - pit stop difficulty index
-- mean temperature during the race window
-- total precipitation during the race window
-- mean humidity during the race window
-- mean wind speed during the race window
+- mean temperature forecast for the race window
+- total precipitation forecast for the race window
+- mean humidity forecast for the race window
+- mean wind speed forecast for the race window
+
+The weather metrics use the forecast that would have been available at
+qualifying time. For completed races this is approximated using a
+10-year historical average for the same location and time window.
 
 The script writes the prepared dataset to `f1_data_2022_to_present.csv` in the current directory.
 
