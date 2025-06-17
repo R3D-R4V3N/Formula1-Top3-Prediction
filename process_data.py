@@ -104,6 +104,21 @@ def load_weather(season: int, round_no: int):
         return {}
 
 
+odi_cache = {}
+
+
+def load_odi(season: int):
+    """Load ODI lookup for the given season (uses previous year)."""
+    if season not in odi_cache:
+        cache_file = os.path.join("odi_cache", f"odi_{season - 1}.json")
+        if os.path.exists(cache_file):
+            with open(cache_file, encoding="utf-8") as f:
+                odi_cache[season] = json.load(f)
+        else:
+            odi_cache[season] = {}
+    return odi_cache[season]
+
+
 def prepare_dataset(start_season: int, end_season: int, output_file: str):
     """Prepare CSV data for the given seasons using cached raw data."""
 
@@ -156,6 +171,8 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                 "precip_sum",
                 "humidity_mean",
                 "wind_mean",
+                "odi_raw",
+                "grid_odi_mult",
             ])
 
         if last:
@@ -241,6 +258,7 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                 )
 
                 weather = load_weather(season, round_no)
+                odi_lookup = load_odi(season)
 
                 # Convert standings to dicts for quick lookup
                 ds_prev_map = {d["Driver"]["driverId"]: d for d in driver_standings_prev}
@@ -385,6 +403,11 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                         else 0.0
                     )
 
+                    odi_raw = odi_lookup.get(circuit_id)
+                    grid_odi_mult = (
+                        grid_pos * odi_raw if odi_raw is not None and grid_pos is not None else None
+                    )
+
                     dnf_flag = 1 if is_dnf(result.get("status")) else 0
 
                     writer.writerow([
@@ -420,6 +443,8 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                         weather.get("precip_sum"),
                         weather.get("humidity_mean"),
                         weather.get("wind_mean"),
+                        odi_raw,
+                        grid_odi_mult,
                     ])
 
                     # Update statistics after writing row

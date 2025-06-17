@@ -142,6 +142,16 @@ def get_pitstops(season: int, round_no: int):
     return []
 
 
+def get_lap_timings(season: int, round_no: int):
+    """Return lap timing data for a given round."""
+    url = f"{BASE_URL}/{season}/{round_no}/laps.json?limit=2000"
+    data = fetch_json(url)
+    races = data.get("RaceTable", {}).get("Races", [])
+    if races:
+        return races[0].get("Laps", [])
+    return []
+
+
 def fetch_weather(season: int, round_no: int):
     """Fetch and cache weather data for the given race."""
     os.makedirs(WEATHER_DIR, exist_ok=True)
@@ -239,8 +249,14 @@ def fetch_round_data(season: int, round_no: int):
         with open(cache_file, encoding="utf-8") as f:
             data = json.load(f)
         # Add newly introduced fields if missing
+        changed = False
         if "pitstops" not in data:
             data["pitstops"] = get_pitstops(season, round_no)
+            changed = True
+        if "laps" not in data:
+            data["laps"] = get_lap_timings(season, round_no)
+            changed = True
+        if changed:
             with open(cache_file, "w", encoding="utf-8") as f:
                 json.dump(data, f)
         return data
@@ -253,6 +269,7 @@ def fetch_round_data(season: int, round_no: int):
     cons_standings = get_constructor_standings(season, round_no)
     qual_results = get_qualifying_results(season, round_no)
     pitstops = get_pitstops(season, round_no)
+    laps = get_lap_timings(season, round_no)
 
     data = {
         "circuit_id": circuit_id,
@@ -261,6 +278,7 @@ def fetch_round_data(season: int, round_no: int):
         "constructor_standings": cons_standings,
         "qualifying": qual_results,
         "pitstops": pitstops,
+        "laps": laps,
     }
 
     with open(cache_file, "w", encoding="utf-8") as f:

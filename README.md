@@ -37,6 +37,20 @@ qualifying time. For completed races this is approximated using a
 
 The script writes the prepared dataset to `f1_data_2022_to_present.csv` in the current directory.
 
+### ODI build (2020-present) & use (2022-present)
+
+An additional Overtake Difficulty Index (ODI) is derived from lap timing data.
+Run `compute_odi.py` before generating the CSV:
+
+```bash
+python compute_odi.py --start 2020 --end <YEAR-1>
+```
+
+This scans seasons 2020 up to `YEAR-1` and stores a lookup under
+`odi_cache/odi_<YEAR-1>.json`. `process_data.py` automatically reads the
+lookup for each season (using the previous year) and appends two columns:
+`odi_raw` and `grid_odi_mult`.
+
 ### Requirements
 
 - Python 3.8+
