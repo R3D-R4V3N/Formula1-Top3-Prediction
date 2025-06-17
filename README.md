@@ -41,7 +41,7 @@ The script writes the prepared dataset to `f1_data_2022_to_present.csv` in the c
 
 - Python 3.8+
 - `requests` library
-- `meteostat`
+- `meteostat` (tested with >=1.7; older versions used a deprecated data endpoint)
 - `pyowm` (optional, for weather forecasts)
 
 Install the dependencies with:

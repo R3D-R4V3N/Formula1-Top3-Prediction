@@ -7,6 +7,13 @@ from datetime import datetime, timedelta
 
 import requests
 from meteostat import Hourly, Point
+from meteostat.interface.timeseries import TimeSeries
+
+# Meteostat versions prior to v1.7 shipped with the deprecated
+# 'data.meteostat.net' endpoint. Explicitly use the current bulk
+# data endpoint to avoid 404 warnings when historical files are
+# requested.
+TimeSeries.endpoint = "https://bulk.meteostat.net/v2/"
 try:
     from pyowm.owm import OWM
 except Exception:  # pragma: no cover - optional dependency may be missing
