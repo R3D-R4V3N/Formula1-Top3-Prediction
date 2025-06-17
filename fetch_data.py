@@ -142,6 +142,16 @@ def get_pitstops(season: int, round_no: int):
     return []
 
 
+def get_lap_times(season: int, round_no: int):
+    """Return lap timing data for a given round."""
+    url = f"{BASE_URL}/{season}/{round_no}/laps.json?limit=2000"
+    data = fetch_json(url)
+    races = data.get("RaceTable", {}).get("Races", [])
+    if races:
+        return races[0].get("Laps", [])
+    return []
+
+
 def fetch_weather(season: int, round_no: int):
     """Fetch and cache weather data for the given race."""
     os.makedirs(WEATHER_DIR, exist_ok=True)

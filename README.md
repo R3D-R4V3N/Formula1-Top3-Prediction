@@ -102,3 +102,25 @@ streamlit run streamlit_app.py
 The app lets you choose a season and round, shows the predicted probabilities
 for each driver, and visualizes global and per-driver feature importance using
 SHAP values.
+
+## ODI build (2020-present) & gebruik (2022-present)
+
+`compute_odi.py` analyseert on‑track inhaalacties vanaf het seizoen 2020 en slaat
+per jaar een lookup op in `odi_cache/`. Voor training of voorspellingen in een
+target‑jaar wordt steeds `odi_<target-jaar-1>.json` gebruikt. De dataset krijgt
+twee extra numerieke features:
+
+* `odi_raw` – de genormaliseerde overtake difficulty per circuit
+* `grid_odi_mult` – startpositie vermenigvuldigd met `odi_raw`
+
+Voorbeeld voor 2025 (gebruikt data t/m 2024):
+
+```bash
+python compute_odi.py --start 2020 --end 2024
+```
+Output:
+
+```
+🔄 scanning overtakes 2020-2024
+✅ wrote ODI for 20 circuits to odi_cache/odi_2024.json
+```

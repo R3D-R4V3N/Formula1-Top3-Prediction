@@ -156,6 +156,8 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                 "precip_sum",
                 "humidity_mean",
                 "wind_mean",
+                "odi_raw",
+                "grid_odi_mult",
             ])
 
         if last:
@@ -171,6 +173,13 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
         circuit_pit_history = {}
 
         for season in range(start_s, end_season + 1):
+            odi_file = os.path.join("odi_cache", f"odi_{season-1}.json")
+            if os.path.exists(odi_file):
+                with open(odi_file, encoding="utf-8") as f:
+                    odi_lookup = json.load(f)
+            else:
+                odi_lookup = {}
+
             round_no = start_r if season == start_s else 1
             while True:
                 log(f"🚦 {season} round {round_no}")
@@ -420,6 +429,12 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                         weather.get("precip_sum"),
                         weather.get("humidity_mean"),
                         weather.get("wind_mean"),
+                        odi_lookup.get(circuit_id),
+                        (
+                            grid_pos * odi_lookup.get(circuit_id)
+                            if grid_pos is not None and odi_lookup.get(circuit_id) is not None
+                            else None
+                        ),
                     ])
 
                     # Update statistics after writing row
