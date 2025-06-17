@@ -286,4 +286,4 @@ def fetch_data(start_season: int, end_season: int):
 
 if __name__ == "__main__":
     current_year = datetime.now().year
-    fetch_data(2022, current_year)
+    fetch_data(2021, current_year)

@@ -4,7 +4,7 @@ This repository contains utilities to download Formula 1 race data using the Jol
 
 ## Data Collection
 
- Raw responses and weather information are downloaded with `fetch_data.py` and stored under `jolpica_f1_cache/<season>/<round>.json` and `weather_cache/`. `process_data.py` reads the cached files and builds `f1_data_2022_to_present.csv`. A helper script `data_collection.py` runs both steps. The processed data includes:
+ Raw responses and weather information are downloaded with `fetch_data.py` (2021 onward) and stored under `jolpica_f1_cache/<season>/<round>.json` and `weather_cache/`. `process_data.py` reads the cached files and builds `f1_data_2022_to_present.csv`. A helper script `data_collection.py` runs both steps. The processed data includes:
 
 - circuit ID
 - start position on the grid
@@ -26,10 +26,15 @@ This repository contains utilities to download Formula 1 race data using the Jol
 - driver DNF rate (rolling window)
 - constructor DNF rate (rolling window)
 - pit stop difficulty index
+- overtake difficulty score
 - mean temperature forecast for the race window
 - total precipitation forecast for the race window
 - mean humidity forecast for the race window
 - mean wind speed forecast for the race window
+
+The overtake difficulty metric is seeded with 2021 race data so that early
+2022 rounds have historical context. All other features begin accumulating from
+the 2022 season.
 
 The weather metrics use the forecast that would have been available at
 qualifying time. For completed races this is approximated using a

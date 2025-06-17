@@ -4,6 +4,7 @@ import csv
 import json
 import os
 from datetime import datetime
+from statistics import median
 
 from fetch_data import fetch_round_data, log
 
@@ -119,6 +120,10 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
     circuit_podiums = {}
     constructor_counts = {}
     constructor_podiums = {}
+    # Dictionaries for overtake difficulty
+    circuit_pos_delta_sum = {}
+    circuit_pos_delta_cnt = {}
+    all_pos_changes = []
 
     with open(output_file, mode, newline="", encoding="utf-8") as csvfile:
         writer = csv.writer(csvfile)
@@ -152,6 +157,7 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                 "driver_dnf_rate",
                 "constructor_dnf_rate",
                 "pit_stop_difficulty",
+                "overtake_difficulty",
                 "temp_mean",
                 "precip_sum",
                 "humidity_mean",
@@ -169,6 +175,34 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
         driver_dnf_history = {}
         constructor_dnf_history = {}
         circuit_pit_history = {}
+
+        # Seed overtake difficulty stats using seasons before start_season
+        for season in range(2021, start_season):
+            r = 1
+            while True:
+                data = fetch_round_data(season, r)
+                if data is None:
+                    break
+                cid = data["circuit_id"]
+                qual_results = data["qualifying"]
+                qual_map = {}
+                for qr in qual_results:
+                    drv = qr["Driver"]["driverId"]
+                    try:
+                        pos = int(qr.get("position"))
+                    except (TypeError, ValueError):
+                        pos = None
+                    qual_map[drv] = pos
+                for res in data["results"]:
+                    drv = res["Driver"]["driverId"]
+                    grid_pos = qual_map.get(drv)
+                    finish_pos = try_int(res.get("position"))
+                    if grid_pos is not None and finish_pos is not None:
+                        pc = abs(grid_pos - finish_pos)
+                        circuit_pos_delta_sum[cid] = circuit_pos_delta_sum.get(cid, 0.0) + pc
+                        circuit_pos_delta_cnt[cid] = circuit_pos_delta_cnt.get(cid, 0) + 1
+                        all_pos_changes.append(pc)
+                r += 1
 
         for season in range(start_s, end_season + 1):
             round_no = start_r if season == start_s else 1
@@ -385,6 +419,13 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                         else 0.0
                     )
 
+                    past_sum = circuit_pos_delta_sum.get(circuit_id)
+                    past_cnt = circuit_pos_delta_cnt.get(circuit_id, 0)
+                    if past_cnt:
+                        overtake_difficulty = past_sum / past_cnt
+                    else:
+                        overtake_difficulty = median(all_pos_changes) if all_pos_changes else 0.0
+
                     dnf_flag = 1 if is_dnf(result.get("status")) else 0
 
                     writer.writerow([
@@ -416,6 +457,7 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                         driver_dnf_rate,
                         constructor_dnf_rate,
                         pit_stop_difficulty,
+                        overtake_difficulty,
                         weather.get("temp_mean"),
                         weather.get("precip_sum"),
                         weather.get("humidity_mean"),
@@ -433,6 +475,16 @@ def prepare_dataset(start_season: int, end_season: int, output_file: str):
                         if finish_pos <= 3:
                             circuit_podiums[circuit_id] = circ_pods + 1
                             constructor_podiums[constructor] = cons_pods + 1
+
+                    if grid_pos is not None and finish_pos is not None:
+                        pc = abs(grid_pos - finish_pos)
+                        circuit_pos_delta_sum[circuit_id] = (
+                            circuit_pos_delta_sum.get(circuit_id, 0.0) + pc
+                        )
+                        circuit_pos_delta_cnt[circuit_id] = (
+                            circuit_pos_delta_cnt.get(circuit_id, 0) + 1
+                        )
+                        all_pos_changes.append(pc)
 
                 if current_psd is not None:
                     circuit_pit_history.setdefault(circuit_id, []).append(current_psd)

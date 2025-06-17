@@ -130,6 +130,16 @@ def build_features(season: int, round_no: int, hist_df: pd.DataFrame) -> pd.Data
         hist_df["circuit_id"] == circuit_id, "pit_stop_difficulty"
     ]
     mean_psd = past_psd.mean()
+
+    hist_df = hist_df.copy()
+    hist_df["abs_pos_change"] = (
+        hist_df["starting_grid_position"] - hist_df["finishing_position"]
+    ).abs()
+    circuit_changes = (
+        hist_df.groupby("circuit_id")["abs_pos_change"].mean().to_dict()
+    )
+    global_median = hist_df["abs_pos_change"].median()
+    mean_change = circuit_changes.get(circuit_id, global_median)
     weather = fetch_weather(season, round_no)
 
     rows = []
@@ -250,6 +260,7 @@ def build_features(season: int, round_no: int, hist_df: pd.DataFrame) -> pd.Data
                 driver_dnf_rate=driver_dnf_rate,
                 constructor_dnf_rate=constructor_dnf_rate,
                 pit_stop_difficulty=mean_psd,
+                overtake_difficulty=mean_change,
                 temp_mean=weather.get("temp_mean"),
                 precip_sum=weather.get("precip_sum"),
                 humidity_mean=weather.get("humidity_mean"),
