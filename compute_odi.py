@@ -79,7 +79,10 @@ def main() -> None:
     if not all_opls:
         log("❌ no data found")
         return
+    min_opl = min(all_opls)
     max_opl = max(all_opls)
+    rng = max_opl - min_opl if max_opl > min_opl else 1e-6
+    log(f"🔍 OPL min={min_opl:.3f}, max={max_opl:.3f}")
 
     odi = {}
     for circ, seasons in raw.items():
@@ -89,7 +92,7 @@ def main() -> None:
         if not hist_seasons:
             continue
         med = median([seasons[s] for s in hist_seasons])
-        val = 1.0 - (med / max_opl if max_opl else 0.0)
+        val = (max_opl - med) / rng
         val = max(0.0, min(1.0, val))
         odi[circ] = val
 
