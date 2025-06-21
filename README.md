@@ -2,6 +2,9 @@
 
 This repository contains utilities to download Formula 1 race data using the Jolpica F1 API. The data can be used for analytics or building predictive models.
 
+The file `nationality.json` maps each driver ID to a country flag emoji. It is
+used by the CLI tool and Streamlit app to display the driver's nationality.
+
 ## Data Collection
 
  Raw responses and weather information are downloaded with `fetch_data.py` and stored under `jolpica_f1_cache/<season>/<round>.json` and `weather_cache/`. `process_data.py` reads the cached files and builds `f1_data_2022_to_present.csv`. A helper script `data_collection.py` runs both steps. The processed data includes:
@@ -100,5 +103,5 @@ streamlit run streamlit_app.py
 ```
 
 The app lets you choose a season and round, shows the predicted probabilities
-for each driver, and visualizes global and per-driver feature importance using
-SHAP values.
+for each driver (with national flag), and visualizes global and per-driver
+feature importance using SHAP values.
