@@ -5,7 +5,11 @@ Run:
     python tune_catboost_optuna_gpu.py --trials 500 --gpu
 """
 
-import argparse, optuna, numpy as np, pandas as pd
+import argparse
+import json
+import optuna
+import numpy as np
+import pandas as pd
 from pathlib import Path
 from catboost import CatBoostClassifier, Pool
 from group_time_series_split import GroupTimeSeriesSplit
@@ -14,6 +18,8 @@ from sklearn.metrics import f1_score
 parser = argparse.ArgumentParser()
 parser.add_argument('--trials', type=int, default=300)
 parser.add_argument('--gpu', action='store_true')
+parser.add_argument('--threshold', type=float, default=0.50)
+parser.add_argument('--log', type=str, default='best_params_gpu.json')
 args = parser.parse_args()
 
 # ---------- Data ----------
@@ -30,10 +36,10 @@ tscv = GroupTimeSeriesSplit(n_splits=5)
 
 def objective(trial):
     params = {
-        'iterations': trial.suggest_int('iterations', 1500, 6000),
-        'learning_rate': trial.suggest_float('lr', 0.01, 0.05, log=True),
-        'depth': trial.suggest_int('depth', 6, 10),
-        'l2_leaf_reg': trial.suggest_int('l2', 2, 10),
+        'iterations': trial.suggest_int('iterations', 3000, 10000),
+        'learning_rate': trial.suggest_float('lr', 0.005, 0.2, log=True),
+        'depth': trial.suggest_int('depth', 6, 12),
+        'l2_leaf_reg': trial.suggest_int('l2', 1, 20),
         'bagging_temperature': trial.suggest_float('bag_temp', 0.0, 1.0),
         'loss_function': 'Logloss',
         'eval_metric': 'Logloss',   # pure GPU metric
@@ -46,7 +52,7 @@ def objective(trial):
     if args.gpu:
         params.update({'task_type': 'GPU', 'devices': '0'})
 
-    thr = trial.suggest_float('thr', 0.40, 0.55)
+    thr = trial.suggest_float('thr', args.threshold - 0.15, args.threshold + 0.15)
     f1s = []
     for tr, te in tscv.split(X, groups=df['group']):
         model = CatBoostClassifier(**params)
@@ -62,3 +68,7 @@ study.optimize(objective, n_trials=args.trials, show_progress_bar=True)
 print('Best study value:', study.best_value)
 print('Best parameters:')
 print(study.best_params)
+
+with open(args.log, 'w') as f:
+    json.dump({'best_f1': study.best_value, **study.best_params}, f, indent=2)
+print(f'Saved best configuration to {args.log}')
