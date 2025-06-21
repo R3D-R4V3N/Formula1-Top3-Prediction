@@ -1,7 +1,6 @@
 import argparse
 from pathlib import Path
 import pandas as pd
-import json
 from catboost import CatBoostClassifier, Pool
 from model_catboost_final import MODEL_PARAMS, THRESHOLD
 from fetch_data import (
@@ -14,9 +13,6 @@ from fetch_data import (
 from process_data import parse_qual_time
 
 DNF_WINDOW = 5
-NATIONALITY_PATH = Path(__file__).with_name("nationality.json")
-with open(NATIONALITY_PATH, "r", encoding="utf-8") as f:
-    NATIONALITY = json.load(f)
 
 
 def is_dnf(status: str) -> bool:
@@ -304,10 +300,7 @@ def main() -> None:
 
     print("\n=== Voorspellingen Top 3 ===")
     for _, row in features.head(3).iterrows():
-        flag = NATIONALITY.get(row['driver_id'], '')
-        print(
-            f"{row['driver_id']} {flag} → kans: {row['Podium kans']:.1f}% {'✅' if row['Voorspelling'] == 1 else ''}"
-        )
+        print(f"{row['driver_id']} → kans: {row['Podium kans']:.1f}% {'✅' if row['Voorspelling'] == 1 else ''}")
 
 
 if __name__ == "__main__":
