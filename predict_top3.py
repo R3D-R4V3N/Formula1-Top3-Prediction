@@ -3,6 +3,7 @@ from pathlib import Path
 import pandas as pd
 from catboost import CatBoostClassifier, Pool
 from model_catboost_final import MODEL_PARAMS, THRESHOLD
+from calibrator_utils import load_or_create_calibrator
 from fetch_data import (
     get_qualifying_results,
     get_driver_standings,
@@ -20,7 +21,6 @@ def is_dnf(status: str) -> bool:
         return True
     status = status.lower()
     return not ("finished" in status or "lap" in status)
-from model_catboost_final import MODEL_PARAMS, THRESHOLD
 
 
 def compute_momentum(history):
@@ -287,6 +287,9 @@ def main() -> None:
     params = MODEL_PARAMS.copy()
     params["class_weights"] = [1.0, (y == 0).sum() / (y == 1).sum()]
 
+    calibrator_path = Path(__file__).with_name("calibrator.joblib")
+    calibrator = load_or_create_calibrator(X, y, train_df["group"], cat_idx, params, calibrator_path)
+
     model = CatBoostClassifier(**params)
     model.fit(Pool(X, y, cat_features=cat_idx))
 
@@ -294,8 +297,9 @@ def main() -> None:
     features = features[X.columns]  # Align feature order
 
     preds = model.predict_proba(Pool(features, cat_features=cat_idx))[:, 1]
-    features["Podium kans"] = preds * 100
-    features["Voorspelling"] = (preds >= THRESHOLD).astype(int)
+    calibrated = calibrator.predict_proba(preds.reshape(-1, 1))[:, 1]
+    features["Podium kans"] = calibrated * 100
+    features["Voorspelling"] = (calibrated >= THRESHOLD).astype(int)
     features = features.sort_values("Podium kans", ascending=False)
 
     print("\n=== Voorspellingen Top 3 ===")
