@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 from catboost import CatBoostClassifier, Pool
-from sklearn.model_selection import TimeSeriesSplit
+from group_time_series_split import GroupTimeSeriesSplit
 from sklearn.metrics import precision_recall_fscore_support, roc_auc_score
 
 # ---------- CLI args ----------
@@ -47,8 +47,8 @@ cat_idx = [X.columns.get_loc(c) for c in ['circuit_id','driver_id','constructor_
 # ---------- collect OOF probabilities ----------
 y_probs = np.zeros_like(y, dtype=float)
 
-tscv = TimeSeriesSplit(n_splits=5)
-for train_idx, test_idx in tscv.split(X):
+tscv = GroupTimeSeriesSplit(n_splits=5)
+for train_idx, test_idx in tscv.split(X, groups=df['group']):
     train_pool = Pool(X.iloc[train_idx], y[train_idx], cat_features=cat_idx)
     valid_pool = Pool(X.iloc[test_idx],  y[test_idx],  cat_features=cat_idx)
     model = CatBoostClassifier(**MODEL_PARAMS)

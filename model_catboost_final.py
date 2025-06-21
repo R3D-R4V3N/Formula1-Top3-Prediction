@@ -21,7 +21,7 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 from catboost import CatBoostClassifier, Pool
-from sklearn.model_selection import TimeSeriesSplit
+from group_time_series_split import GroupTimeSeriesSplit
 from sklearn.metrics import (
     accuracy_score,
     precision_recall_fscore_support,
@@ -63,10 +63,10 @@ cat_idx = [X.columns.get_loc(c) for c in cat_cols]
 MODEL_PARAMS["class_weights"] = [1.0, (y == 0).sum() / (y == 1).sum()]
 
 # -------------------- Cross‑validation --------------------
-tscv = TimeSeriesSplit(n_splits=5)
+tscv = GroupTimeSeriesSplit(n_splits=5)
 metrics = {k: [] for k in ["acc", "prec", "rec", "f1", "auc"]}
 
-for fold, (train_idx, test_idx) in enumerate(tscv.split(X), 1):
+for fold, (train_idx, test_idx) in enumerate(tscv.split(X, groups=df["group"]), 1):
     model = CatBoostClassifier(**MODEL_PARAMS)
 
     train_pool = Pool(X.iloc[train_idx], y[train_idx], cat_features=cat_idx)

@@ -8,7 +8,7 @@ Run:
 import argparse, optuna, numpy as np, pandas as pd
 from pathlib import Path
 from catboost import CatBoostClassifier, Pool
-from sklearn.model_selection import TimeSeriesSplit
+from group_time_series_split import GroupTimeSeriesSplit
 from sklearn.metrics import f1_score
 
 # ---------- CLI ----------
@@ -27,7 +27,7 @@ if 'dnf_flag' in df.columns:
 X = df.drop(columns=drop_cols)
 y = df.top3_flag.values
 cat_idx = [X.columns.get_loc(c) for c in ['circuit_id', 'driver_id', 'constructor_id']]
-tscv = TimeSeriesSplit(n_splits=5)
+tscv = GroupTimeSeriesSplit(n_splits=5)
 
 # ---------- Objective ----------
 
@@ -46,7 +46,7 @@ def objective(trial):
     }
     thr = trial.suggest_float('thr', args.threshold-0.1, args.threshold+0.1)
     f1s = []
-    for tr, te in tscv.split(X):
+    for tr, te in tscv.split(X, groups=df['group']):
         model = CatBoostClassifier(**params)
         model.fit(Pool(X.iloc[tr], y[tr], cat_features=cat_idx),
                   eval_set=Pool(X.iloc[te], y[te], cat_features=cat_idx),
