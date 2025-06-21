@@ -2,15 +2,19 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from pathlib import Path
+import json
 from catboost import CatBoostClassifier, Pool
 from model_catboost_final import MODEL_PARAMS
 
 # -------------------- Config --------------------
 THRESHOLD = 0.42  # recall-geoptimaliseerde threshold
 DATA_PATH = Path(__file__).with_name("f1_data_2022_to_present.csv")
+NATIONALITY_PATH = Path(__file__).with_name("nationality.json")
 
 # -------------------- Load data --------------------
 df = pd.read_csv(DATA_PATH)
+with open(NATIONALITY_PATH, "r", encoding="utf-8") as f:
+    NATIONALITY = json.load(f)
 
 if "top3_flag" not in df.columns:
     df["top3_flag"] = (df["finishing_position"] <= 3).astype(int)
@@ -22,6 +26,8 @@ group_options = sorted(df["group"].unique())
 selected_group = st.selectbox("Selecteer race (season-round)", options=group_options, index=len(group_options)-1)
 
 race_df = df[df["group"] == selected_group].copy()
+race_df["Flag"] = race_df["driver_id"].map(NATIONALITY).fillna("")
+race_df["Driver"] = race_df["driver_id"] + " " + race_df["Flag"]
 input_df = race_df.drop(columns=["finishing_position", "top3_flag", "group"], errors="ignore")
 
 cat_cols = ["circuit_id", "driver_id", "constructor_id"]
@@ -49,7 +55,7 @@ st.title("🏁 F1 Podium Predictie (Top 3)")
 st.subheader(f"Resultaten voor race: {selected_group}")
 
 st.dataframe(
-    race_df[["driver_id", "constructor_id", "Podium kans", "Voorspelling", "Waarde Tip"]]
+    race_df[["Driver", "constructor_id", "Podium kans", "Voorspelling", "Waarde Tip"]]
     .sort_values("Podium kans", ascending=False)
     .reset_index(drop=True)
 )
