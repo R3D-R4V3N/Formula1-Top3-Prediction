@@ -1,9 +1,8 @@
 import argparse
 from pathlib import Path
-
 import pandas as pd
 from catboost import CatBoostClassifier, Pool
-
+from model_catboost_final import MODEL_PARAMS, THRESHOLD
 from fetch_data import (
     get_qualifying_results,
     get_driver_standings,
@@ -289,19 +288,19 @@ def main() -> None:
     params["class_weights"] = [1.0, (y == 0).sum() / (y == 1).sum()]
 
     model = CatBoostClassifier(**params)
-    train_pool = Pool(X, y, cat_features=cat_idx)
-    model.fit(train_pool)
+    model.fit(Pool(X, y, cat_features=cat_idx))
 
     features = build_features(args.season, args.round, train_df)
-    # Ensure prediction features align with training column order
-    features = features[X.columns]
-    preds = model.predict_proba(Pool(features, cat_features=cat_idx))[:, 1]
-    features["prob"] = preds
-    top3 = features.sort_values("prob", ascending=False).head(3)["driver_id"].tolist()
+    features = features[X.columns]  # Align feature order
 
-    print("Predicted podium drivers:")
-    for drv in top3:
-        print(drv)
+    preds = model.predict_proba(Pool(features, cat_features=cat_idx))[:, 1]
+    features["Podium kans"] = preds * 100
+    features["Voorspelling"] = (preds >= THRESHOLD).astype(int)
+    features = features.sort_values("Podium kans", ascending=False)
+
+    print("\n=== Voorspellingen Top 3 ===")
+    for _, row in features.head(3).iterrows():
+        print(f"{row['driver_id']} → kans: {row['Podium kans']:.1f}% {'✅' if row['Voorspelling'] == 1 else ''}")
 
 
 if __name__ == "__main__":
