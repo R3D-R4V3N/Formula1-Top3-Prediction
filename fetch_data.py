@@ -216,7 +216,7 @@ def fetch_weather(season: int, round_no: int):
                 fc = mgr.forecast_hourly(lat=lat, lon=lon)
                 hours = [
                     h
-                    for h in fc.forecast
+                    for h in getattr(fc, "forecast", getattr(fc, "weathers", []))
                     if start <= h.reference_time("date") <= end
                 ]
                 if hours:
@@ -230,6 +230,35 @@ def fetch_weather(season: int, round_no: int):
                         "humidity_mean": sum(hums) / len(hums) if hums else None,
                         "wind_mean": sum(winds) / len(winds) if winds else None,
                     }
+            if features["temp_mean"] is None:
+                try:
+                    resp = requests.get(
+                        "https://api.open-meteo.com/v1/forecast",
+                        params={
+                            "latitude": lat,
+                            "longitude": lon,
+                            "hourly": "temperature_2m,precipitation,relativehumidity_2m,wind_speed",
+                            "start": start.isoformat() + "Z",
+                            "end": end.isoformat() + "Z",
+                            "timezone": "UTC",
+                        },
+                        timeout=10,
+                    )
+                    resp.raise_for_status()
+                    hourly = resp.json().get("hourly", {})
+                    temps = hourly.get("temperature_2m", [])
+                    prcps = hourly.get("precipitation", [])
+                    hums = hourly.get("relativehumidity_2m", [])
+                    winds = hourly.get("wind_speed", [])
+                    if temps:
+                        features = {
+                            "temp_mean": float(sum(temps) / len(temps)),
+                            "precip_sum": float(sum(prcps)),
+                            "humidity_mean": float(sum(hums) / len(hums)),
+                            "wind_mean": float(sum(winds) / len(winds)),
+                        }
+                except Exception:
+                    pass
     except Exception:
         pass
 
