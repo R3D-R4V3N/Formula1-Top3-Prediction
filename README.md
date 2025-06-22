@@ -122,6 +122,7 @@ decision threshold. A typical workflow is:
 
    The script writes the best model parameters and a suggested threshold to
    `optuna_best_params.json`.
+   Older files using keys like `lr` or `l2` are automatically converted.
 
 3. Determine the final decision threshold with out-of-fold predictions:
 

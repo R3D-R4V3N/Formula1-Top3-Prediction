@@ -30,10 +30,20 @@ MODEL_PARAMS = dict(
 PARAMS_FILE = Path(__file__).with_name("optuna_best_params.json")
 THRESHOLD_FILE = Path(__file__).with_name("best_threshold.json")
 
+def _normalize_params(params: dict) -> dict:
+    """Convert shorthand keys from older tuning outputs."""
+    mapping = {
+        "lr": "learning_rate",
+        "l2": "l2_leaf_reg",
+        "bag_temp": "bagging_temperature",
+    }
+    return {mapping.get(k, k): v for k, v in params.items()}
+
 if PARAMS_FILE.exists():
     with open(PARAMS_FILE, encoding="utf-8") as f:
         loaded = json.load(f)
-    MODEL_PARAMS.update(loaded.get("model_params", loaded))
+    params = _normalize_params(loaded.get("model_params", loaded))
+    MODEL_PARAMS.update(params)
     if "threshold" in loaded:
         THRESHOLD = loaded["threshold"]
 

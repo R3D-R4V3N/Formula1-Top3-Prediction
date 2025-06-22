@@ -11,6 +11,16 @@ from sklearn.calibration import CalibratedClassifierCV
 from sklearn.linear_model import LogisticRegression
 from model_catboost_final import MODEL_PARAMS
 
+
+def _normalize_params(params: dict) -> dict:
+    """Convert shorthand keys from older tuning outputs."""
+    mapping = {
+        "lr": "learning_rate",
+        "l2": "l2_leaf_reg",
+        "bag_temp": "bagging_temperature",
+    }
+    return {mapping.get(k, k): v for k, v in params.items()}
+
 # ---------- CLI args ----------
 parser = argparse.ArgumentParser(description="Threshold scan for CatBoost model")
 parser.add_argument("--start", type=float, default=0.50, help="starting threshold (inclusive)")
@@ -26,7 +36,8 @@ args = parser.parse_args()
 if args.params:
     with open(args.params, encoding='utf-8') as f:
         loaded = json.load(f)
-    MODEL_PARAMS.update(loaded.get('model_params', loaded))
+    params = _normalize_params(loaded.get('model_params', loaded))
+    MODEL_PARAMS.update(params)
 
 # ---------- load data ----------
 df = pd.read_csv(Path(args.data))
