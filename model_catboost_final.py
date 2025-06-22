@@ -11,7 +11,8 @@ from sklearn.metrics import (
 from sklearn.linear_model import LogisticRegression
 
 # -------------------- Config --------------------
-THRESHOLD = 0.42  # adjusted to favor higher recall for betting purposes
+# Decision threshold tuned via threshold_scan_final.py --calibrate
+THRESHOLD = 0.52
 
 MODEL_PARAMS = dict(
     iterations=4864,

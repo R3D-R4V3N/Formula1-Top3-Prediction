@@ -6,7 +6,8 @@ from catboost import CatBoostClassifier, Pool
 from model_catboost_final import MODEL_PARAMS
 
 # -------------------- Config --------------------
-THRESHOLD = 0.42  # recall-geoptimaliseerde threshold
+# Decision threshold tuned via threshold_scan_final.py --calibrate
+THRESHOLD = 0.52
 DATA_PATH = Path(__file__).with_name("f1_data_2022_to_present.csv")
 
 # -------------------- Load data --------------------
