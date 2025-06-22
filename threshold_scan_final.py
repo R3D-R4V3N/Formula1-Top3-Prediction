@@ -1,4 +1,5 @@
 import argparse
+import json
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -17,11 +18,18 @@ parser.add_argument("--end", type=float, default=0.65, help="ending threshold (i
 parser.add_argument("--step", type=float, default=0.02, help="threshold step size")
 parser.add_argument("--calibrate", action="store_true", help="apply Platt calibration")
 parser.add_argument("--save", type=str, default=None, help="optional path to save results as CSV")
+parser.add_argument("--data", type=str, default='f1_data_2022_to_present.csv')
+parser.add_argument("--params", type=str, default=None, help="JSON with model parameters")
+parser.add_argument("--save-json", type=str, default=None, help="optional path to save best threshold as JSON")
 args = parser.parse_args()
 
+if args.params:
+    with open(args.params, encoding='utf-8') as f:
+        loaded = json.load(f)
+    MODEL_PARAMS.update(loaded.get('model_params', loaded))
+
 # ---------- load data ----------
-csv_path = Path(__file__).with_name("f1_data_2022_to_present.csv")
-df = pd.read_csv(csv_path)
+df = pd.read_csv(Path(args.data))
 
 if 'top3_flag' not in df.columns:
     df['top3_flag'] = (df['finishing_position'] <= 3).astype(int)
@@ -68,6 +76,10 @@ print(f"\nBest threshold: {best.threshold:.2f} -> F1 = {best.f1:.3f}, Recall = {
 if args.save:
     df_res.to_csv(args.save, index=False)
     print(f"Saved results to {args.save}")
+if args.save_json:
+    with open(args.save_json, 'w', encoding='utf-8') as f:
+        json.dump({'threshold': float(best.threshold)}, f, indent=2)
+    print(f"Saved best threshold to {args.save_json}")
 
 # ---------- plot ----------
 plt.figure(figsize=(10, 6))
@@ -81,3 +93,4 @@ plt.legend()
 plt.grid(True)
 plt.tight_layout()
 plt.show()
+

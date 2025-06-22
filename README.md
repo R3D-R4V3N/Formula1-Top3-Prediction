@@ -102,3 +102,44 @@ streamlit run streamlit_app.py
 The app lets you choose a season and round, shows the predicted probabilities
 for each driver, and visualizes global and per-driver feature importance using
 SHAP values.
+
+## Advanced Model Tuning
+
+The repository includes utilities to tune the CatBoost model and optimise the
+decision threshold. A typical workflow is:
+
+1. Fetch and process the latest race data:
+
+   ```bash
+   python data_collection.py
+   ```
+
+2. Run Optuna hyper-parameter search (use `--gpu` on systems with a GPU):
+
+   ```bash
+   python tune_catboost_optuna_cpu.py --trials 300 --output optuna_best_params.json
+   ```
+
+   The script writes the best model parameters and a suggested threshold to
+   `optuna_best_params.json`.
+
+3. Determine the final decision threshold with out-of-fold predictions:
+
+   ```bash
+   python threshold_scan_final.py --calibrate \
+       --params optuna_best_params.json \
+       --save threshold_results.csv \
+       --save-json best_threshold.json
+   ```
+
+   This saves the threshold sweep to `threshold_results.csv` and the best value
+   to `best_threshold.json`.
+
+4. Train and evaluate the final calibrated model:
+
+   ```bash
+   python model_catboost_final.py
+   ```
+
+The script automatically loads the parameters and threshold from the JSON files
+if they are present.

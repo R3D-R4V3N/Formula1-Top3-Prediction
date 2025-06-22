@@ -5,7 +5,11 @@ Run:
     python tune_catboost_optuna_gpu.py --trials 500 --gpu
 """
 
-import argparse, optuna, numpy as np, pandas as pd
+import argparse
+import json
+import optuna
+import numpy as np
+import pandas as pd
 from pathlib import Path
 from catboost import CatBoostClassifier, Pool
 from group_time_series_split import GroupTimeSeriesSplit
@@ -14,10 +18,12 @@ from sklearn.metrics import f1_score
 parser = argparse.ArgumentParser()
 parser.add_argument('--trials', type=int, default=300)
 parser.add_argument('--gpu', action='store_true')
+parser.add_argument('--data', type=str, default='f1_data_2022_to_present.csv')
+parser.add_argument('--output', type=str, default='optuna_best_params.json')
 args = parser.parse_args()
 
 # ---------- Data ----------
-df = pd.read_csv(Path(__file__).with_name('f1_data_2022_to_present.csv'))
+df = pd.read_csv(Path(args.data))
 df['top3_flag'] = (df.finishing_position <= 3).astype(int)
 df['group'] = df.season_year.astype(str) + '-' + df.round_number.astype(str)
 drop_cols = ['finishing_position', 'top3_flag', 'group']
@@ -62,3 +68,10 @@ study.optimize(objective, n_trials=args.trials, show_progress_bar=True)
 print('Best study value:', study.best_value)
 print('Best parameters:')
 print(study.best_params)
+
+best = study.best_params.copy()
+threshold = best.pop('thr')
+output = {'model_params': best, 'threshold': threshold}
+with open(args.output, 'w', encoding='utf-8') as f:
+    json.dump(output, f, indent=2)
+print(f'Saved best parameters to {args.output}')

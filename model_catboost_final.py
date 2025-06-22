@@ -1,3 +1,4 @@
+import json
 import numpy as np
 import pandas as pd
 from pathlib import Path
@@ -25,6 +26,20 @@ MODEL_PARAMS = dict(
     random_seed=42,
     verbose=False,
 )
+
+PARAMS_FILE = Path(__file__).with_name("optuna_best_params.json")
+THRESHOLD_FILE = Path(__file__).with_name("best_threshold.json")
+
+if PARAMS_FILE.exists():
+    with open(PARAMS_FILE, encoding="utf-8") as f:
+        loaded = json.load(f)
+    MODEL_PARAMS.update(loaded.get("model_params", loaded))
+    if "threshold" in loaded:
+        THRESHOLD = loaded["threshold"]
+
+if THRESHOLD_FILE.exists():
+    with open(THRESHOLD_FILE, encoding="utf-8") as f:
+        THRESHOLD = json.load(f).get("threshold", THRESHOLD)
 
 # -------------------- Load data --------------------
 csv_path = Path(__file__).with_name("f1_data_2022_to_present.csv")
@@ -75,3 +90,4 @@ auc = roc_auc_score(y, y_probs_calibrated)
 
 print("\n=== Final Calibrated CatBoost Results (Recall-Focused) ===")
 print(f"acc={acc:.3f}  prec={prec:.3f}  rec={rec:.3f}  f1={f1:.3f}  auc={auc:.3f}")
+
